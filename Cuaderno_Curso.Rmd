@@ -116,7 +116,6 @@ from statsmodels.multivariate.manova import MANOVA  # MANOVA (Análisis multivar
 # 🔹 Machine Learning (scikit-learn)
 # --------------------------------
 from sklearn.datasets import load_iris    # Dataset de ejemplo (Iris)
-from sklearn.datasets import fetch_openml # Descarga de datasets de OpenML
 from sklearn.preprocessing import StandardScaler  # Escalamiento de datos
 from sklearn.preprocessing import MinMaxScaler    # Normalización de datos [0,1]
 from sklearn.decomposition import PCA     # Análisis de Componentes Principales
@@ -3087,16 +3086,21 @@ ggplot() +
 
 ## 6.7) Ejemplo con Python
 
+```{r include=FALSE}
+bfi_items_py <- psych::bfi[, 1:25]
+bfi_items_py <- stats::na.omit(bfi_items_py)
+```
+
 ```{python}
 # ===========================
 # Análisis Factorial en Python
 # ===========================
 
 # ---------- 1) Datos ----------
-# Usamos el dataset "bfi" de personalidad (similar al de R psych::bfi)
-bfi = fetch_openml("bfi", version=1, as_frame=True).frame
-df = bfi.iloc[:, :25]      # ítems A1:A5, C1:C5, E1:E5, N1:N5, O1:O5
-df = df.dropna()
+# Usamos el dataset "bfi" de personalidad desde R psych::bfi.
+# Así evitamos depender de OpenML durante el render.
+df = r.bfi_items_py.copy()  # ítems A1:A5, C1:C5, E1:E5, N1:N5, O1:O5
+df = df.apply(pd.to_numeric, errors="coerce").dropna()
 n, p = df.shape
 print(f"Observaciones: {n}, Variables: {p}")
 
