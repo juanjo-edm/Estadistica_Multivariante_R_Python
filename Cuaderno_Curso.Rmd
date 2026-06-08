@@ -623,7 +623,7 @@ Veamos cómo hacer boxplots por grupos
 
 ```{python message=FALSE, warning=FALSE}
 # Boxplots
-sns.boxplot(x="Species", y="PetalLengthCm", data=iris  ,linewidth=2.5 )
+sns.boxplot(x="Species", y="petal length (cm)", data=iris, linewidth=2.5)
 plt.show()
 ```
 

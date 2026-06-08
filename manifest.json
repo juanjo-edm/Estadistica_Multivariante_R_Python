@@ -6854,7 +6854,7 @@
   },
   "files": {
     "Cuaderno_Curso.Rmd": {
-      "checksum": "c9a4c20d1620749d548d426469ec1f52"
+      "checksum": "ff643af8fb101faadb64f1a3f0641346"
     },
     "images/clipboard-1528658378.png": {
       "checksum": "37c4e942dc46347d8a15b2156c1d4b44"
@@ -6881,7 +6881,7 @@
       "checksum": "cc18a80295662c2f572ecbe6e1abcf08"
     },
     "requirements.txt": {
-      "checksum": "8a52e21b83eb737c0ce5631ed3821117"
+      "checksum": "58240faea9fa8e0946b34584fd3dec9d"
     }
   },
   "users": null
