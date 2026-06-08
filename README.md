@@ -57,7 +57,7 @@ En R, el cuaderno carga paquetes como `tidyverse`, `ggplot2`, `GGally`,
 En Python, las dependencias principales quedan documentadas en
 `requirements.txt`, incluyendo paquetes como `numpy`, `pandas`, `scipy`,
 `scikit-learn`, `seaborn`, `matplotlib`, `plotly`, `statsmodels`,
-`factor_analyzer`, `imbalanced-learn` y `pydataset`.
+`factor_analyzer`, `imbalanced-learn`, `networkx` y `pydataset`.
 
 ## Entorno Python
 
@@ -87,8 +87,8 @@ Rscript scripts/manifest.R
 
 Ese script primero regenera `requirements.txt` y luego crea
 `manifest.json` usando `Cuaderno_Curso.Rmd` como documento principal. El
-archivo `manifest.json` se considera un artefacto generado localmente y
-no se versiona.
+archivo `manifest.json` se versiona porque Posit Connect Cloud lo usa
+para reconstruir el entorno de R desde GitHub.
 
 ## Renderizar el cuaderno
 

@@ -13,7 +13,8 @@ requirements <- system2(
 
 deployment_requirements <- c(
   "ipython>=8.0.0",
-  "nbformat>=5.0.0"
+  "nbformat>=5.0.0",
+  "networkx"
 )
 
 installed_packages <- tolower(sub("([<>=!~].*)$", "", requirements))
