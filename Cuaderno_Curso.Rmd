@@ -86,6 +86,7 @@ import pandas as pd                       # Manipulación y análisis de datos e
 import matplotlib.pyplot as plt           # Visualización básica y gráficos 2D
 import seaborn as sns                     # Visualización estadística (gráficos más elaborados)
 import plotly.express as px               # Visualización interactiva (2D y 3D)
+import scipy as sc                        # Acceso al namespace general de SciPy
 
 # --------------------------------
 # 🔹 Estadística y distribuciones
@@ -657,16 +658,17 @@ sc.stats.describe(X)
 Densidades kernels
 
 ```{python fig.height=15, fig.width=15, message=FALSE, warning=FALSE}
-sns.distplot(X[Y == 0,2],bins=10)
-sns.distplot(X[Y == 1,2],bins=10)
-sns.distplot(X[Y == 2,2],bins=10)
+sns.histplot(X[Y == 0, 2], bins=10, kde=True, stat="density", element="step", label="setosa")
+sns.histplot(X[Y == 1, 2], bins=10, kde=True, stat="density", element="step", label="versicolor")
+sns.histplot(X[Y == 2, 2], bins=10, kde=True, stat="density", element="step", label="virginica")
+plt.legend()
 plt.show()
 ```
 
 KDE (Kernel density estimation) de una sola variable
 
 ```{python fig.height=15, fig.width=15, message=FALSE, warning=FALSE}
-sns.distplot(X[:,1],bins=10)
+sns.histplot(X[:, 1], bins=10, kde=True, stat="density")
 plt.show()
 ```
 
