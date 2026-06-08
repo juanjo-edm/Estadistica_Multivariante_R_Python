@@ -23,8 +23,30 @@ Primero,  ajustamos librerías de Python y R, para poder trabajar con ambos de f
 ```{r message=FALSE, warning=FALSE, include=FALSE}
 library(reticulate)
 
-# Forzar a usar el ambiente correcto
-use_condaenv("py311_arm", required = TRUE)
+# En despliegues con rsconnect/Posit Connect, Python se crea desde
+# requirements.txt y suele exponerse mediante RETICULATE_PYTHON.
+connect_python <- Sys.getenv("RETICULATE_PYTHON", unset = "")
+
+if (nzchar(connect_python)) {
+  use_python(connect_python, required = TRUE)
+} else {
+  conda_available <- tryCatch({
+    conda <- conda_binary("auto")
+    nzchar(conda) && file.exists(conda)
+  }, error = function(e) FALSE)
+
+  conda_envs <- if (conda_available) {
+    tryCatch(conda_list()$name, error = function(e) character())
+  } else {
+    character()
+  }
+
+  if ("py311_arm" %in% conda_envs) {
+    use_condaenv("py311_arm", required = TRUE)
+  } else {
+    message("No se encontro conda/py311_arm; reticulate usara el Python disponible.")
+  }
+}
 
 # Confirmar que está bien enlazado
 py_config()
@@ -49,7 +71,7 @@ py_config()
 
 ```
 
-Ese bloque de código en R configura la integración con Python mediante la librería reticulate: primero carga el paquete, luego indica que se use el intérprete de Python definido en la variable de entorno RETICULATE_PYTHON (que apunta a /usr/local/bin/python3.13), después cambia el contexto para trabajar dentro de una virtualenv específica ubicada en tu carpeta de iCloud (donde están las librerías de Python que deseas usar), y finalmente ejecuta py_config() para mostrar la configuración activa, confirmando qué versión de Python y qué entorno se están utilizando.
+Ese bloque de código en R configura la integración con Python mediante la librería reticulate. En despliegues con rsconnect o Posit Connect, usa el intérprete definido en la variable de entorno `RETICULATE_PYTHON`, creado a partir de `requirements.txt`. En ejecución local, intenta usar el entorno Conda `py311_arm` si está disponible; si no lo encuentra, deja que reticulate use el Python disponible. Finalmente ejecuta `py_config()` para mostrar la configuración activa, confirmando qué versión de Python y qué entorno se están utilizando.
 
 
 Cargamos librerias de Python
