@@ -200,6 +200,19 @@ library(ICSNP)
 library(ggplot2)
 
 
+# Preferir verbos tidyverse cuando otros paquetes cargados despues
+# exportan funciones con el mismo nombre (por ejemplo Hotelling::summarise).
+filter <- dplyr::filter
+select <- dplyr::select
+mutate <- dplyr::mutate
+summarise <- dplyr::summarise
+summarize <- dplyr::summarize
+group_by <- dplyr::group_by
+arrange <- dplyr::arrange
+rename <- dplyr::rename
+pivot_longer <- tidyr::pivot_longer
+pivot_wider <- tidyr::pivot_wider
+
 # Quitar notacion cientifica
 options(scipen = 999)  # Cuanto mayor el número, menos notación científica
 ```
@@ -243,7 +256,7 @@ Graficamos boxplot por variable
 ```{r fig.height=10, fig.width=10, message=FALSE, warning=FALSE}
 X_long <- X %>% 
   rownames_to_column("State") %>%
-  pivot_longer(-State, names_to = "Variable", values_to = "Value")
+  tidyr::pivot_longer(-State, names_to = "Variable", values_to = "Value")
 
 ggplot(X_long, aes(x = Variable, y = Value)) +
   geom_boxplot(fill = "skyblue") +
@@ -381,7 +394,7 @@ La principal diferencia entre el kernel Gaussiano y el Epanechnikov radica en la
 
 ```{r fig.height=12, fig.width=12, message=FALSE, warning=FALSE}
 plot_list <- lapply(unique(X_long$Variable), function(var){
-  ggplot(filter(X_long, Variable == var), aes(x = Value)) +
+  ggplot(dplyr::filter(X_long, Variable == var), aes(x = Value)) +
     geom_density(kernel = "gaussian", color = "blue", fill = "blue", alpha = 0.3) +
     geom_density(kernel = "epanechnikov", color = "green", fill = "green", alpha = 0.2) +
     labs(title = paste("Kernel Gaussiano vs Epanechnikov:", var)) +
@@ -518,7 +531,7 @@ X$Region <- state.region  # vector disponible en R base
 
 # Calcular la mediana multivariada por grupo (por ejemplo, por Región)
 medianas_region <- X %>%
-  group_by(Region) %>%
+  dplyr::group_by(Region) %>%
   group_modify(~ {
     d <- depth.halfspace(.x[, c("Population", "Income", "Illiteracy", "Life Exp")],
                          .x[, c("Population", "Income", "Illiteracy", "Life Exp")],
@@ -889,7 +902,7 @@ data("mtcars")
 df <- mtcars %>%
   rownames_to_column("modelo") %>%
   clean_names() %>%
-  mutate(cyl = as.factor(cyl))  # tratamos cyl como variable categórica
+  dplyr::mutate(cyl = as.factor(cyl))  # tratamos cyl como variable categórica
 
 # 1. Variables multivariantes - gráfico de pares
 df %>%
@@ -925,14 +938,14 @@ personas <- tibble(
 )
 # P(enfermedad | test positivo)
 bayes_prob <- personas %>%
-  filter(test_positivo == 1) %>%
-  summarise(prob = mean(enfermedad == 1))
+  dplyr::filter(test_positivo == 1) %>%
+  dplyr::summarise(prob = mean(enfermedad == 1))
 
 print(bayes_prob)
 
 # 6. Valor esperado, covarianza y correlación
 df %>%
-  summarise(
+  dplyr::summarise(
     valor_esperado_mpg = mean(mpg),
     var_hp = var(hp),
     cov_mpg_hp = cov(mpg, hp),
@@ -941,8 +954,8 @@ df %>%
 
 # 7. Esperanza condicional y ley de varianza total
 esperanza_condicional <- df %>%
-  group_by(cyl) %>%
-  summarise(media_mpg = mean(mpg), varianza_mpg = var(mpg), .groups = "drop")
+  dplyr::group_by(cyl) %>%
+  dplyr::summarise(media_mpg = mean(mpg), varianza_mpg = var(mpg), .groups = "drop")
 
 var_total <- var(df$mpg)
 esperanza_cond <- mean(esperanza_condicional$varianza_mpg)
@@ -1280,7 +1293,7 @@ eucl_dist <- apply(data, 1, function(x) sqrt(sum((x - mu)^2)))
 
 # Agregar resultados al dataframe
 data_plot <- data %>%
-  mutate(
+  dplyr::mutate(
     Car = rownames(.),
     Mahalanobis = mahal_dist,
     Euclidean = eucl_dist
@@ -1292,11 +1305,11 @@ alpha <- 0.05
 threshold <- qchisq(1 - alpha, df = p)
 
 data_plot <- data_plot %>%
-  mutate(Outlier = Mahalanobis > threshold)
+  dplyr::mutate(Outlier = Mahalanobis > threshold)
 
 # Imprimir los outliers
 cat("Observaciones consideradas outliers (Mahalanobis > ", round(threshold, 2), "):\n")
-print(data_plot %>% filter(Outlier) %>% select(Car, Mahalanobis))
+print(data_plot %>% dplyr::filter(Outlier) %>% dplyr::select(Car, Mahalanobis))
 
 # Gráfico: comparación entre distancias Euclidianas y Mahalanobis
 ggplot(data_plot, aes(x = Euclidean, y = Mahalanobis, label = Car, color = Outlier)) +
@@ -1766,7 +1779,7 @@ Estos estadísticos sirven como base para realizar inferencias sobre la poblaci�
 
 # Usar el dataset iris (solo las variables numéricas)
 data(iris)
-datos_numericos <- iris %>% select(Sepal.Length, Sepal.Width, Petal.Length, Petal.Width)
+datos_numericos <- iris %>% dplyr::select(Sepal.Length, Sepal.Width, Petal.Length, Petal.Width)
 
 # 1. Vector de medias muestral
 medias <- colMeans(datos_numericos)
@@ -2647,8 +2660,8 @@ L$MaxAbs   <- apply(abs(L[, fact_cols]), 1, max)
 L <- L[order(L$Dominant, -L$MaxAbs), ]
 
 L_long <- L |>
-  select(Item, all_of(fact_cols)) |>
-  pivot_longer(cols = all_of(fact_cols), names_to = "Factor", values_to = "Loading")
+  dplyr::select(Item, all_of(fact_cols)) |>
+  tidyr::pivot_longer(cols = all_of(fact_cols), names_to = "Factor", values_to = "Loading")
 
 L_long$Item <- factor(L_long$Item, levels = unique(L$Item))
 
@@ -4247,7 +4260,7 @@ set.seed(123)
 
 # 1. Dataset iris (usamos 2 variables para graficar fácilmente)
 datos <- iris %>%
-  select(Sepal.Length, Sepal.Width, Species)
+  dplyr::select(Sepal.Length, Sepal.Width, Species)
 
 # 2. Entrenar modelo LDA
 modelo_lda <- lda(Species ~ Sepal.Length + Sepal.Width, data = datos)
