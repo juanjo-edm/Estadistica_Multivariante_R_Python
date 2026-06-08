@@ -615,14 +615,14 @@ iris_num.describe()
 Gráficamente, ¿cómo podemos ver la cantidad de observaciones en cada grupo?
 
 ```{python}
-sns.countplot('Species',data=iris)
+sns.countplot(x="Species", data=iris)
 plt.show()
 ```
 
 Veamos cómo hacer boxplots por grupos
 
 ```{python message=FALSE, warning=FALSE}
- Boxplots
+# Boxplots
 sns.boxplot(x="Species", y="PetalLengthCm", data=iris  ,linewidth=2.5 )
 plt.show()
 ```
