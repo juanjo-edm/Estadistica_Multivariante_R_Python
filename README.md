@@ -5,9 +5,9 @@ Este portafolio contiene un cuaderno de curso sobre estadistica
 multivariante avanzada implementado unicamente en R. El material
 principal esta en `Cuaderno_Curso.Rmd` e integra explicaciones teoricas,
 formulas, ejemplos reproducibles y visualizaciones sobre espacio
-multivariante, distribuciones multivariantes, inferencia, PCA, analisis
-factorial, escalamiento multidimensional, clusterizacion, clasificacion,
-regresion y regularizacion.
+multivariante, correlaciones, distribuciones multivariantes, inferencia,
+PCA, analisis factorial, escalamiento multidimensional, clusterizacion,
+clasificacion, regresion y regularizacion.
 
 La seccion de regresion enfatiza la lectura tecnica de `summary(lm)`,
 errores estandar, p-valores, grados de libertad, intervalos, diagnostico

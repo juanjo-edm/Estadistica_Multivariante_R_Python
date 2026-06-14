@@ -511,13 +511,184 @@ Aquí, P(A)P(A) es la probabilidad inicial (a priori) de AA, P(B∣A)P(B∣A
 
 Este teorema es clave en situaciones donde tenemos información parcial o incierta y queremos mejorar nuestras predicciones. Por ejemplo, si un test médico da positivo (BB), el Teorema de Bayes permite calcular la probabilidad de que una persona realmente tenga la enfermedad (AA) considerando tanto la precisión del test como la prevalencia de la enfermedad. Se aplica ampliamente en estadística bayesiana, diagnóstico médico, inteligencia artificial y toma de decisiones bajo incertidumbre.
 
-## 2.3)**El valor esperado, la covarianaza y la correlacion**
+## 2.3) **El valor esperado, la covarianza y la correlacion**
 
 El **valor esperado** (o esperanza matemática) es el promedio ponderado de todos los posibles valores de una variable aleatoria, donde cada valor se multiplica por su probabilidad. Representa el resultado promedio que se esperaría si un experimento se repitiera infinitas veces. Por ejemplo, en economía, el valor esperado se usa para estimar ingresos futuros o evaluar decisiones bajo incertidumbre, como en modelos de riesgo o teoría de juegos.
 
 La **covarianza** mide cómo varían dos variables aleatorias juntas. Si es positiva, significa que tienden a aumentar o disminuir simultáneamente; si es negativa, cuando una sube, la otra tiende a bajar. Aunque indica la dirección de la relación, su magnitud depende de las unidades de medida, por lo que no siempre es fácil de interpretar directamente. Se utiliza, por ejemplo, en portafolios financieros para medir cómo se mueven juntas dos acciones.
 
-La **correlación**, en cambio, es una versión estandarizada de la covarianza que siempre toma valores entre -1 y 1, y permite comparar relaciones entre variables sin importar sus unidades. Una correlación cercana a 1 indica una relación lineal positiva fuerte; cercana a -1, una relación negativa fuerte; y cercana a 0, poca o ninguna relación lineal. Es fundamental en análisis estadístico, machine learning, ciencia de datos y econometría para identificar patrones, seleccionar variables o evaluar asociaciones entre fenómenos.
+La **correlación**, en cambio, es una versión estandarizada de la covarianza que permite comparar relaciones entre variables sin importar sus unidades. En muchas correlaciones el rango va de $-1$ a $1$: valores cercanos a $1$ indican asociación positiva fuerte, valores cercanos a $-1$ indican asociación negativa fuerte, y valores cercanos a $0$ indican poca asociación bajo el criterio usado. Es fundamental en análisis estadístico, machine learning, ciencia de datos y econometría para identificar patrones, seleccionar variables o evaluar asociaciones entre fenómenos.
+
+### 2.3.1) Tipos de correlacion y cuando usarlos
+
+No toda correlacion mide lo mismo. La eleccion depende del tipo de variable, la escala de medicion, la forma de la relacion y el objetivo del analisis. La siguiente guia resume las opciones mas usadas en analisis exploratorio, negocio y modelado:
+
+![Tipos de correlacion segun tipo de variable](images/tipos-correlacion.png)
+
+**Pearson** mide asociacion lineal entre dos variables continuas. Es la correlacion clasica entre $X$ y $Y$:
+
+$$
+r_{XY} = \frac{\sum_{i=1}^{n}(x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum_{i=1}^{n}(x_i - \bar{x})^2}\sqrt{\sum_{i=1}^{n}(y_i - \bar{y})^2}}
+$$
+
+Tambien puede escribirse como:
+
+$$
+r_{XY} = \frac{\mathrm{Cov}(X,Y)}{s_Xs_Y}
+$$
+
+Se usa cuando interesa una relacion aproximadamente lineal y las variables son numericas continuas. Es sensible a outliers: un solo punto extremo puede cambiar mucho el coeficiente.
+
+**Spearman** calcula Pearson sobre los rangos de las variables. Es util cuando la relacion es monotona pero no necesariamente lineal:
+
+$$
+\rho_s = cor(R_X, R_Y)
+$$
+
+Si no hay empates, tambien puede expresarse como:
+
+$$
+\rho_s = 1 - \frac{6\sum_{i=1}^{n}d_i^2}{n(n^2 - 1)}
+$$
+
+donde $d_i$ es la diferencia entre los rangos de $x_i$ y $y_i$. Es apropiada para rankings, variables ordinales o relaciones crecientes/decrecientes no lineales.
+
+**Kendall** mide concordancia entre pares. Para dos observaciones cualesquiera, un par es concordante si el orden de $X$ coincide con el orden de $Y$, y discordante si el orden se invierte:
+
+$$
+\tau = \frac{C - D}{\binom{n}{2}}
+$$
+
+donde $C$ es el numero de pares concordantes y $D$ el numero de pares discordantes. Suele ser robusta e interpretable en muestras pequenas o con muchos datos ordinales.
+
+**Punto-biserial** se usa cuando una variable es binaria y la otra continua. En la practica equivale a una correlacion de Pearson entre una variable codificada como $0/1$ y una variable numerica:
+
+$$
+r_{pb} = \frac{\bar{Y}_1 - \bar{Y}_0}{s_Y}\sqrt{\frac{n_1n_0}{n^2}}
+$$
+
+Sirve, por ejemplo, para relacionar aceptacion de una campana ($0/1$) con gasto mensual.
+
+**Phi** mide asociacion entre dos variables binarias y se calcula sobre una tabla $2 \times 2$:
+
+$$
+\phi = \frac{ad - bc}{\sqrt{(a+b)(c+d)(a+c)(b+d)}}
+$$
+
+Es especialmente util en conversion/no conversion, compra/no compra o renovacion/no renovacion.
+
+**V de Cramer** generaliza Phi a tablas de contingencia $R \times C$ para variables nominales:
+
+$$
+V = \sqrt{\frac{\chi^2}{n\min(R-1, C-1)}}
+$$
+
+Su rango va de $0$ a $1$: valores cercanos a $0$ indican baja asociacion y valores cercanos a $1$ indican asociacion fuerte. No tiene signo porque en variables nominales sin orden no hay direccion natural.
+
+**Correlacion policorica** estima la asociacion entre variables ordinales que se interpretan como versiones categorizadas de variables continuas latentes. Es comun en escalas Likert, por ejemplo satisfaccion de $1$ a $5$ frente a calidad percibida de $1$ a $5$. La idea es asumir variables latentes $X^*$ y $Y^*$ aproximadamente normales:
+
+$$
+X = categoria(X^*), \quad Y = categoria(Y^*)
+$$
+
+y estimar la correlacion entre $X^*$ y $Y^*$, no solo entre los numeros visibles de las categorias.
+
+**Correlacion parcial** mide la relacion entre $X$ y $Y$ despues de controlar una tercera variable $Z$:
+
+$$
+r_{XY \cdot Z} =
+\frac{r_{XY} - r_{XZ}r_{YZ}}
+{\sqrt{(1-r_{XZ}^2)(1-r_{YZ}^2)}}
+$$
+
+Es util cuando queremos aislar el efecto neto de una variable. Por ejemplo, medir transacciones vs inversion comercial controlando estacionalidad. Aun asi, correlacion parcial no prueba causalidad por si sola: solo elimina linealmente la variacion asociada con las variables de control incluidas.
+
+| Tipo de variables | Correlacion recomendada | Lectura practica |
+|---|---|---|
+| Continua + continua, relacion lineal | Pearson $r$ | Asociacion lineal estandarizada; revisar outliers |
+| Continua + continua, relacion monotona | Spearman $\rho_s$ | Asociacion por rangos; no exige linealidad |
+| Ordinal + ordinal | Kendall $\tau$ | Concordancia de pares; buena en muestras pequenas |
+| Binaria + continua | Punto-biserial $r_{pb}$ | Diferencia estandarizada entre grupos $0/1$ |
+| Binaria + binaria | Phi $\phi$ | Asociacion en tabla $2 \times 2$ |
+| Nominal + nominal | V de Cramer $V$ | Fuerza de asociacion en tablas $R \times C$ |
+| Likert + Likert | Policorica | Asociacion entre variables latentes ordinalizadas |
+| Controlando otra variable | Correlacion parcial | Asociacion neta despues de remover el control |
+
+```{r message=FALSE, warning=FALSE}
+set.seed(123)
+n_corr <- 150
+
+df_corr <- tibble(
+  ingreso = rnorm(n_corr, mean = 100, sd = 20),
+  satisfaccion_latente = rnorm(n_corr),
+  estacionalidad = rnorm(n_corr)
+) %>%
+  dplyr::mutate(
+    gasto = 20 + 0.65 * ingreso + rnorm(n_corr, 0, 12),
+    prob_recompra = plogis(0.9 * satisfaccion_latente),
+    satisfaccion = ordered(dplyr::ntile(satisfaccion_latente, 5), levels = 1:5),
+    ranking_ventas = rank(-ingreso, ties.method = "average"),
+    ranking_rentabilidad = rank(-(0.5 * ingreso + rnorm(n_corr, 0, 15)), ties.method = "average"),
+    acepto_campana = rbinom(n_corr, 1, plogis(-2 + 0.02 * ingreso)),
+    renovo_seguro = rbinom(n_corr, 1, plogis(-1 + 1.2 * acepto_campana)),
+    transacciones = 30 + 0.6 * ingreso + 10 * estacionalidad + rnorm(n_corr, 0, 8),
+    inversion = 15 + 0.5 * ingreso + 12 * estacionalidad + rnorm(n_corr, 0, 8),
+    calidad_atencion = ordered(
+      dplyr::ntile(satisfaccion_latente + rnorm(n_corr, 0, 0.6), 5),
+      levels = 1:5
+    )
+  )
+
+tabla_nominal <- table(
+  region = sample(c("Norte", "Sur", "Centro"), n_corr, replace = TRUE),
+  canal = sample(c("Digital", "Sucursal", "Telefono"), n_corr, replace = TRUE)
+)
+
+chi2_nominal <- suppressWarnings(chisq.test(tabla_nominal, correct = FALSE)$statistic)
+v_cramer <- sqrt(as.numeric(chi2_nominal) / (sum(tabla_nominal) * (min(dim(tabla_nominal)) - 1)))
+
+rho_policorica <- psych::polychoric(
+  df_corr[, c("satisfaccion", "calidad_atencion")]
+)$rho[1, 2]
+
+res_x <- residuals(lm(transacciones ~ estacionalidad, data = df_corr))
+res_y <- residuals(lm(inversion ~ estacionalidad, data = df_corr))
+
+tibble(
+  medida = c(
+    "Pearson",
+    "Spearman",
+    "Kendall",
+    "Punto-biserial",
+    "Phi",
+    "V de Cramer",
+    "Policorica",
+    "Parcial"
+  ),
+  ejemplo = c(
+    "ingreso vs gasto",
+    "satisfaccion vs probabilidad de recompra",
+    "ranking de ventas vs ranking de rentabilidad",
+    "acepto campana vs gasto",
+    "acepto campana vs renovo seguro",
+    "region vs canal",
+    "satisfaccion Likert vs calidad Likert",
+    "transacciones vs inversion controlando estacionalidad"
+  ),
+  valor = round(c(
+    cor(df_corr$ingreso, df_corr$gasto, method = "pearson"),
+    cor(as.numeric(df_corr$satisfaccion), df_corr$prob_recompra, method = "spearman"),
+    cor(df_corr$ranking_ventas, df_corr$ranking_rentabilidad, method = "kendall"),
+    cor(df_corr$acepto_campana, df_corr$gasto),
+    cor(df_corr$acepto_campana, df_corr$renovo_seguro),
+    v_cramer,
+    rho_policorica,
+    cor(res_x, res_y)
+  ), 3)
+)
+```
+
+En la practica, el orden de decision es: primero identificar el tipo de variables, luego mirar la forma de la relacion con graficos, despues elegir la correlacion y finalmente interpretar el resultado en contexto. Una correlacion alta puede ser util para detectar patrones o construir modelos, pero no implica causalidad automaticamente; pueden existir variables omitidas, relaciones espurias, sesgos de seleccion o efectos de confusores.
 
 ## 2.4) **Esperanza condicional y la ley de varianza total**
 
