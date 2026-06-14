@@ -1,8 +1,6 @@
 Estadistica Multivariante Avanzada en R
 ================
 
-# Estadistica Multivariante Avanzada en R
-
 Este portafolio contiene un cuaderno de curso sobre estadistica
 multivariante avanzada implementado unicamente en R. El material
 principal esta en `Cuaderno_Curso.Rmd` e integra explicaciones teoricas,
