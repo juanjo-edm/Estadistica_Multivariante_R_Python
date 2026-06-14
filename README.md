@@ -1,111 +1,94 @@
-Estadistica Multivariante Avanzada
+Estadistica Multivariante Avanzada en R
 ================
 
-# Estadistica Multivariante Avanzada
+# Estadistica Multivariante Avanzada en R
 
-Este repositorio contiene un cuaderno de curso sobre estadistica
-multivariante avanzada en R y Python. El material principal esta en
-`Cuaderno_Curso.Rmd` y combina explicaciones teoricas, ejemplos
-reproducibles y visualizaciones para temas como espacio multivariante,
-distribuciones multivariantes, inferencia, PCA, analisis factorial,
-escalamiento multidimensional, clusterizacion, clasificacion y
-regularizacion.
+Este portafolio contiene un cuaderno de curso sobre estadistica
+multivariante avanzada implementado unicamente en R. El material
+principal esta en `Cuaderno_Curso.Rmd` e integra explicaciones teoricas,
+formulas, ejemplos reproducibles y visualizaciones sobre espacio
+multivariante, distribuciones multivariantes, inferencia, PCA, analisis
+factorial, escalamiento multidimensional, clusterizacion, clasificacion,
+regresion y regularizacion.
 
-El proyecto esta pensado para trabajarse desde RStudio y para publicarse
-en GitHub manteniendo el cuaderno como fuente principal. Los archivos
-HTML renderizados se pueden regenerar localmente y no se versionan para
-mantener liviano el repositorio.
+La seccion de regresion enfatiza la lectura tecnica de `summary(lm)`,
+errores estandar, p-valores, grados de libertad, intervalos, diagnostico
+de residuales, multicolinealidad, validacion cruzada y comparacion entre
+inferencia y prediccion.
 
-## Estructura del repositorio
+El proyecto esta pensado para trabajarse desde RStudio o desde una
+sesion estandar de R. Los archivos renderizados se pueden regenerar
+localmente y no forman parte de la fuente limpia del portafolio.
+
+## Estructura del portafolio
 
 ``` text
 .
 ├── Cuaderno_Curso.Rmd
 ├── README.Rmd
 ├── README.md
-├── requirements.txt
-├── scripts/
-│   ├── manifest.R
-│   └── requirements.R
-├── images/
-├── examples/
-│   └── section-4/
+├── Curso avanzado de estadistica multivariante.Rproj
+├── data/
+│   └── companies79.csv
 ├── docs/
-└── outputs/
+│   └── libro-multivariante.pdf
+├── images/
+└── scripts/
+    ├── render.R
+    └── seccion_4/
+        ├── 01_usa_states.R
+        └── 02_iris_dataset.R
 ```
 
 - `Cuaderno_Curso.Rmd`: cuaderno principal del curso.
-- `scripts/requirements.R`: regenera `requirements.txt` desde el entorno
-  Python usado por `reticulate`.
-- `scripts/manifest.R`: regenera `requirements.txt` y luego crea
-  `manifest.json` para despliegue con `rsconnect`.
-- `images/`: imagenes usadas directamente por el cuaderno principal.
-- `examples/section-4/`: scripts y datos de ejemplo complementarios.
+- `README.Rmd`: fuente editable de este README.
+- `README.md`: version renderizada para GitHub.
+- `data/`: datos complementarios usados por scripts de ejemplo.
 - `docs/`: documentacion de apoyo.
-- `outputs/`: salidas HTML renderizadas localmente; esta carpeta esta
-  ignorada por Git.
+- `images/`: imagenes referenciadas por el cuaderno principal.
+- `scripts/render.R`: renderiza el README y el cuaderno principal desde
+  R.
+- `scripts/seccion_4/`: scripts R complementarios de la seccion 4.
 
 ## Requisitos
 
 El cuaderno usa paquetes de R para analisis, visualizacion, modelado y
-despliegue. Tambien usa Python mediante `reticulate`.
+reportes. Entre los paquetes principales estan `tidyverse`, `ggplot2`,
+`GGally`, `plotly`, `MASS`, `mvtnorm`, `mclust`, `copula`, `Hotelling`,
+`ellipse`, `psych`, `GPArotation`, `corrplot`, `vegan`, `cluster`,
+`factoextra`, `caret`, `class`, `e1071`, `glmnet`, `ggpubr`, `broom`,
+`car`, `leaps`, `ddalpha`, `scatterplot3d`, `patchwork`, `aplpack`,
+`janitor`, `scales`, `ICSNP` y `reshape2`.
 
-En R, el cuaderno carga paquetes como `tidyverse`, `ggplot2`, `GGally`,
-`plotly`, `psych`, `factoextra`, `mclust`, `vegan`, `caret`, `glmnet`,
-`rsconnect` y otros paquetes estadisticos.
-
-En Python, las dependencias principales quedan documentadas en
-`requirements.txt`, incluyendo paquetes como `numpy`, `pandas`, `scipy`,
-`scikit-learn`, `seaborn`, `matplotlib`, `plotly`, `statsmodels`,
-`factor_analyzer`, `imbalanced-learn`, `networkx` y `pydataset`.
-
-## Entorno Python
-
-El cuaderno configura Python con `reticulate` usando el entorno
-`py311_arm`:
+Instala los paquetes faltantes desde R antes de renderizar:
 
 ``` r
-reticulate::use_condaenv("py311_arm", required = TRUE)
+install.packages(c(
+  "tidyverse", "GGally", "plotly", "mvtnorm", "mclust", "copula",
+  "Hotelling", "ellipse", "psych", "GPArotation", "corrplot",
+  "vegan", "cluster", "factoextra", "caret", "e1071", "glmnet",
+  "ggpubr", "broom", "car", "leaps", "ddalpha", "scatterplot3d",
+  "patchwork", "aplpack", "janitor", "ICSNP", "reshape2"
+))
 ```
 
-Para mantener sincronizado el archivo de dependencias Python, ejecuta:
+## Renderizar
+
+Para regenerar el README y el cuaderno principal:
 
 ``` bash
-Rscript scripts/requirements.R
+Rscript scripts/render.R
 ```
 
-Este script actualiza `requirements.txt` con los paquetes instalados en
-el entorno Python configurado.
-
-## Manifest para despliegue
-
-Para crear o actualizar el manifest de `rsconnect`, ejecuta:
-
-``` bash
-Rscript scripts/manifest.R
-```
-
-Ese script primero regenera `requirements.txt` y luego crea
-`manifest.json` usando `Cuaderno_Curso.Rmd` como documento principal. El
-archivo `manifest.json` se versiona porque Posit Connect Cloud lo usa
-para reconstruir el entorno de R desde GitHub.
-
-## Renderizar el cuaderno
-
-Para renderizar el cuaderno principal localmente:
+Tambien puedes renderizar solo el cuaderno:
 
 ``` bash
 Rscript -e 'rmarkdown::render("Cuaderno_Curso.Rmd")'
 ```
 
-Las salidas HTML generadas deben guardarse o moverse a `outputs/`,
-carpeta que esta ignorada por Git para evitar subir archivos pesados.
+## Notas
 
-## Notas para GitHub
-
-- `README.Rmd` es la fuente editable del README.
-- `README.md` es el archivo que GitHub muestra directamente.
-- Las imagenes en `images/` se mantienen en su ruta actual porque
-  `Cuaderno_Curso.Rmd` las referencia directamente.
-- Los archivos de sesion de RStudio, caches, salidas renderizadas y
-  metadatos locales de despliegue estan excluidos mediante `.gitignore`.
+- El portafolio fuente no requiere dependencias externas a R.
+- Los datos, imagenes y PDF se conservan como material de soporte.
+- Los archivos HTML renderizados, metadatos locales y salidas de
+  despliegue se consideran artefactos regenerables.

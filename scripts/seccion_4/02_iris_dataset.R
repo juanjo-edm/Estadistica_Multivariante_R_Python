@@ -54,7 +54,7 @@ sapply(seq(1,4),function(j)boxplot(Y[,j]~Y[,5],main=colnames(Y)[j],xlab="",col="
 # Obtener un bagplot 
 ##################################################################################################################
 
-install.packages("aplpack")
+# install.packages("aplpack")
 library(aplpack)
 bagplot(Y$Sepal.Length,Y$Sepal.Width,xlab="Sepal.Length", ylab="Sepal.Width", main="Bagplot")
 
@@ -136,7 +136,7 @@ library(plotly)
 plot_ly(Y,x=~Sepal.Length,y=~Petal.Length,z=~Petal.Width,color=c("blue","green","orange")[Y[,5]]) # Otra posibilidad
 
 library(plot3Drgl)
-install.packages("plot3Drgl")
+# install.packages("plot3Drgl")
 plot3d( Y$Sepal.Length, Y$Sepal.Width, Y$Petal.Length, col = Y$Petal.Width,  type = "s",   radius = 0.1)
 play3d( spin3d( axis = c(0, 0, 1),    rpm = 7),duration = 100 )
 
@@ -288,4 +288,3 @@ SY <- Ytil %*% B
 colMeans(SY)
 cov(SY)
 pairs(SY,pch=19,col=c("blue","green","orange")[Y[,5]])
-

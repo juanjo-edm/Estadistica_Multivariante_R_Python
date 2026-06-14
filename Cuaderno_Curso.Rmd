@@ -1,5 +1,5 @@
 ---
-title: "Estadistica multivariante avanzada en R y Python"
+title: "Estadistica multivariante avanzada en R"
 author: "Juan José Echeverry"
 output: 
   html_notebook:
@@ -16,147 +16,9 @@ output:
 # Introducción
 
 
-El presente cuaderno resume los temas vistos en el [curso](https://github.com/joanby/curso-estadistica-multivariante) de estadística multivariante de R y Python.
+El presente cuaderno resume los temas vistos en el [curso](https://github.com/joanby/curso-estadistica-multivariante) de estadística multivariante en R.
 
-Primero,  ajustamos librerías de Python y R, para poder trabajar con ambos de forma simultanea
-
-```{r message=FALSE, warning=FALSE, include=FALSE}
-library(reticulate)
-
-# En despliegues con rsconnect/Posit Connect, Python se crea desde
-# requirements.txt y suele exponerse mediante RETICULATE_PYTHON.
-connect_python <- Sys.getenv("RETICULATE_PYTHON", unset = "")
-
-if (nzchar(connect_python)) {
-  use_python(connect_python, required = TRUE)
-} else {
-  conda_available <- tryCatch({
-    conda <- conda_binary("auto")
-    nzchar(conda) && file.exists(conda)
-  }, error = function(e) FALSE)
-
-  conda_envs <- if (conda_available) {
-    tryCatch(conda_list()$name, error = function(e) character())
-  } else {
-    character()
-  }
-
-  if ("py311_arm" %in% conda_envs) {
-    use_condaenv("py311_arm", required = TRUE)
-  } else {
-    message("No se encontro conda/py311_arm; reticulate usara el Python disponible.")
-  }
-}
-
-# Confirmar que está bien enlazado
-py_config()
-
-# # Instalar los paquetes de Python necesarios
-# py_install(c(
-#   "numpy", 
-#   "scipy", 
-#   "pandas", 
-#   "seaborn", 
-#   "matplotlib", 
-#   "plotly", 
-#   "scikit-learn", 
-#   "scikit-learn-extra",   # Para KMedoids
-#   "imblearn",             # Para SMOTE y pipelines
-#   "statsmodels",          # Modelos estadísticos
-#   "factor-analyzer",      # Análisis factorial
-#   "pydataset"             # Datasets de ejemplo
-# ), pip = TRUE)
-
-
-
-```
-
-Ese bloque de código en R configura la integración con Python mediante la librería reticulate. En despliegues con rsconnect o Posit Connect, usa el intérprete definido en la variable de entorno `RETICULATE_PYTHON`, creado a partir de `requirements.txt`. En ejecución local, intenta usar el entorno Conda `py311_arm` si está disponible; si no lo encuentra, deja que reticulate use el Python disponible. Finalmente ejecuta `py_config()` para mostrar la configuración activa, confirmando qué versión de Python y qué entorno se están utilizando.
-
-
-Cargamos librerias de Python
-
-```{python message=FALSE, warning=FALSE}
-# ===============================
-# 📦 Librerías necesarias en Python
-# ===============================
-
-import numpy as np                        # Álgebra lineal y operaciones numéricas
-import pandas as pd                       # Manipulación y análisis de datos en DataFrames
-import matplotlib.pyplot as plt           # Visualización básica y gráficos 2D
-import seaborn as sns                     # Visualización estadística (gráficos más elaborados)
-import plotly.express as px               # Visualización interactiva (2D y 3D)
-import plotly.io as pio                   # Configuración de renderizadores Plotly
-import scipy as sc                        # Acceso al namespace general de SciPy
-
-try:
-    import IPython
-    pio.renderers.default = "notebook_connected"
-except ImportError:
-    pass
-
-# --------------------------------
-# 🔹 Estadística y distribuciones
-# --------------------------------
-from scipy.stats import norm              # Distribución normal y funciones estadísticas
-from scipy.stats import multivariate_normal # Distribución normal multivariante
-from scipy.stats import chi2              # Distribución chi-cuadrado
-from scipy.stats import bartlett          # Test de esfericidad de Bartlett
-from scipy.stats import multivariate_t    # Distribución t multivariante
-from scipy.spatial.distance import mahalanobis  # Distancia de Mahalanobis
-from scipy.spatial.distance import pdist        # Distancias por pares entre observaciones
-
-# --------------------------------
-# 🔹 Modelos estadísticos
-# --------------------------------
-import statsmodels.api as sm              # Modelos estadísticos (regresión, tests, etc.)
-from statsmodels.multivariate.manova import MANOVA  # MANOVA (Análisis multivariante de varianza)
-
-# --------------------------------
-# 🔹 Machine Learning (scikit-learn)
-# --------------------------------
-from sklearn.datasets import load_iris    # Dataset de ejemplo (Iris)
-from sklearn.preprocessing import StandardScaler  # Escalamiento de datos
-from sklearn.preprocessing import MinMaxScaler    # Normalización de datos [0,1]
-from sklearn.decomposition import PCA     # Análisis de Componentes Principales
-from sklearn.manifold import MDS          # Escalamiento multidimensional
-from sklearn.cluster import KMeans        # Clustering k-means
-from sklearn_extra.cluster import KMedoids  # Clustering k-medoids
-from sklearn.mixture import GaussianMixture     # Modelos de mezcla gaussiana (clustering)
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis # Análisis discriminante lineal (LDA)
-from sklearn.neighbors import KNeighborsClassifier # Clasificación k-NN
-from sklearn.naive_bayes import GaussianNB       # Clasificador Naive Bayes Gaussiano
-from sklearn.linear_model import LogisticRegression # Regresión logística
-from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet  # Modelos de regresión
-from sklearn.linear_model import RidgeCV, LassoCV, ElasticNetCV   # Regularización con validación cruzada
-from sklearn.metrics import mean_squared_error, r2_score           # Métricas de desempeño de modelos
-from sklearn.metrics import pairwise_distances                     # Matrices de distancia
-from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV  # Validación de modelos
-
-# --------------------------------
-# 🔹 Balanceo y pipelines (ML)
-# --------------------------------
-from imblearn.over_sampling import SMOTE   # Oversampling para clases desbalanceadas
-from imblearn.pipeline import Pipeline     # Pipelines con técnicas de balanceo
-
-# --------------------------------
-# 🔹 Análisis factorial
-# --------------------------------
-from factor_analyzer import FactorAnalyzer, calculate_bartlett_sphericity, calculate_kmo  
-# Análisis factorial y tests de adecuación (Bartlett y KMO)
-
-# --------------------------------
-# 🔹 Herramientas adicionales
-# --------------------------------
-from scipy.cluster.hierarchy import dendrogram, linkage, fcluster  # Clustering jerárquico
-from math import pi                        # Constantes matemáticas
-from pandas.plotting import scatter_matrix, andrews_curves, parallel_coordinates  
-# Gráficos multivariantes con pandas
-
-
-
-```
-
+Primero, cargamos las librerías de R necesarias para reproducir los ejemplos. El proyecto se ejecuta únicamente con R, sin dependencias de otros lenguajes.
 Cargamos librerías de R
 
 ```{r message=FALSE, warning=FALSE}
@@ -564,288 +426,61 @@ ggplot(X, aes(x = Income, y = `Life Exp`, color = Region)) +
 
 Este código en R carga el conjunto de datos state.x77, añade el nombre del estado como columna y asigna a cada estado una región (Region) usando el vector state.region. Luego, calcula la mediana multivariada por región utilizando la función depth.halfspace, que identifica el punto más central (con mayor profundidad estadística) dentro de las variables Population, Income, Illiteracy y Life Exp. Finalmente, se genera un gráfico con ggplot2 que muestra la relación entre Income (ingreso) y Life Exp (esperanza de vida), donde cada punto representa un estado y está coloreado según su región. Los puntos grandes en negro indican la mediana multivariada de cada región, lo que permite comparar visualmente la posición central de cada grupo regional en el espacio de las dos variables seleccionadas.
 
-## 1.2) Ejemplo con Python:
+## 1.2) Ejemplo en R
 
-El dataset de Iris es un conjunto de datos clásico en estadística y aprendizaje automático que contiene 150 observaciones de flores del género Iris, divididas en tres especies: setosa, versicolor y virginica. Para cada flor se registran cuatro características numéricas: largo y ancho del sépalo, y largo y ancho del pétalo (en centímetros), lo que permite analizar diferencias entre especies y aplicar técnicas de clasificación, reducción de dimensión y visualización multivariada.
+```{r fig.height=10, fig.width=12, message=FALSE, warning=FALSE}
+iris_r <- iris
+names(iris_r) <- c("sepal_length", "sepal_width", "petal_length", "petal_width", "Species")
 
-**Primero**, cargamos datos
+names(iris_r)
+str(iris_r)
+head(iris_r)
+dim(iris_r)
+table(iris_r$Species)
+summary(iris_r)
 
-```{python}
+iris_long <- tidyr::pivot_longer(iris_r, cols = -Species, names_to = "Variable", values_to = "Valor")
 
+ggplot(iris_r, aes(x = Species, fill = Species)) +
+  geom_bar(show.legend = FALSE) +
+  labs(title = "Frecuencia por especie", x = "Especie", y = "Conteo") +
+  theme_minimal()
 
-# Cargar el dataset
-iris_bunch = load_iris()
+ggplot(iris_long, aes(x = Species, y = Valor, fill = Species)) +
+  geom_boxplot(show.legend = FALSE) +
+  facet_wrap(~ Variable, scales = "free_y") +
+  labs(title = "Boxplots por variable y especie", x = "Especie", y = "Valor") +
+  theme_minimal()
 
-# Crear el DataFrame con las variables + columna 'Species'
-iris = pd.DataFrame(
-    data=iris_bunch.data,
-    columns=iris_bunch.feature_names
-)
+ggplot(iris_long, aes(x = Valor)) +
+  geom_histogram(bins = 12, color = "white", fill = "steelblue") +
+  facet_wrap(~ Variable, scales = "free") +
+  labs(title = "Histogramas de variables Iris", x = "Valor", y = "Frecuencia") +
+  theme_minimal()
 
-# Agregar directamente la columna 'Species' con nombres legibles
-iris['Species'] = iris_bunch.target_names[iris_bunch.target]
+data.frame(Variable = names(iris_r)[1:4], Media = colMeans(iris_r[, 1:4]), Varianza = apply(iris_r[, 1:4], 2, var), Minimo = apply(iris_r[, 1:4], 2, min), Maximo = apply(iris_r[, 1:4], 2, max))
 
+ggplot(iris_r, aes(x = petal_length, color = Species, fill = Species)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 10, alpha = 0.25, position = "identity") +
+  geom_density(linewidth = 1) +
+  labs(title = "Distribucion de petal_length por especie", x = "Petal length", y = "Densidad") +
+  theme_minimal()
 
-# Validams los nombres de las columnas del df
-iris.columns
+GGally::ggpairs(iris_r, columns = 1:4, aes(color = Species, alpha = 0.6))
+corrplot::corrplot(cor(iris_r[, 1:4]), method = "color", type = "upper", addCoef.col = "black")
 
+iris_scaled <- as.data.frame(scale(iris_r[, 1:4], center = FALSE, scale = apply(iris_r[, 1:4], 2, max)))
+MASS::parcoord(iris_scaled, col = as.numeric(iris_r$Species), var.label = TRUE)
+legend("topright", legend = levels(iris_r$Species), col = seq_along(levels(iris_r$Species)), lty = 1, cex = 0.8)
+
+andrews_curve <- function(x, t) x[1] / sqrt(2) + x[2] * sin(t) + x[3] * cos(t) + x[4] * sin(2 * t)
+t_grid <- seq(-pi, pi, length.out = 200)
+curve_df <- do.call(rbind, lapply(seq_len(nrow(iris_r)), function(i) data.frame(t = t_grid, y = andrews_curve(as.numeric(iris_r[i, 1:4]), t_grid), Species = iris_r$Species[i], id = i)))
+ggplot(curve_df, aes(x = t, y = y, group = id, color = Species)) +
+  geom_line(alpha = 0.35) +
+  labs(title = "Curvas de Andrews para Iris", x = "t", y = "f(t)") +
+  theme_minimal()
 ```
-
-Ahora vamos a hacernos las primeras preguntas:
-
-1.  ¿Cuántos datos hay en el dataset?
-2.  ¿Cuántas variables?
-3.  ¿Cuántos grupos de variables o categorías?
-4.  ¿Cuántas observaciones corresponden a cada grupo?
-
-```{python}
-iris.info()
-```
-
-Podemos ver que el conjunto de datos tine 150 filas por 5 columnas. De las cuales 4 son numericas y una es categorica
-
-```{python}
-iris.head
-```
-
-```{python}
-iris.shape
-```
-
-Vemos el formato de del df que es 150 x 5
-
-Renombramos df
-
-```{python}
-iris_num=iris
-```
-
-Vemos los valores unicos de la variable especie
-
-```{python}
-iris_num['Species'].value_counts()
-```
-
-¿Qué medidas numéricas podemos obtener para describir los datos?
-
-```{python}
-iris_num.describe()
-```
-
-Gráficamente, ¿cómo podemos ver la cantidad de observaciones en cada grupo?
-
-```{python}
-sns.countplot(x="Species", data=iris)
-plt.show()
-```
-
-Veamos cómo hacer boxplots por grupos
-
-```{python message=FALSE, warning=FALSE}
-# Boxplots
-sns.boxplot(x="Species", y="petal length (cm)", data=iris, linewidth=2.5)
-plt.show()
-```
-
-```{python fig.height=15, fig.width=15, message=FALSE, warning=FALSE}
-# Boxplots para cada variable divididos por grupos en "Species"
-iris_num.boxplot(by="Species", figsize=(12, 6))
-plt.show() #esto último se pone cuando no se quiere que salga el último mensaje informativo
-```
-
-Veamos cómo hacer histogramas por grupos
-
-```{python fig.height=15, fig.width=15, message=FALSE, warning=FALSE}
-# Histogramas 
-iris_num.hist(edgecolor='black', linewidth=1.2, grid=False, figsize=(12, 6))
-plt.show()
-```
-
-Con scipy(sc).stats podemos obtener medidas numéricas que describen las variables
-
-```{python fig.height=15, fig.width=15, message=FALSE, warning=FALSE}
-irissk = load_iris()
-
-#irissk es ahora un numpy array 
-X = irissk.data
-Y = irissk.target
-
-# Descripcion estadistica
-sc.stats.describe(X)
-```
-
-Densidades kernels
-
-```{python fig.height=15, fig.width=15, message=FALSE, warning=FALSE}
-sns.histplot(X[Y == 0, 2], bins=10, kde=True, stat="density", element="step", label="setosa")
-sns.histplot(X[Y == 1, 2], bins=10, kde=True, stat="density", element="step", label="versicolor")
-sns.histplot(X[Y == 2, 2], bins=10, kde=True, stat="density", element="step", label="virginica")
-plt.legend()
-plt.show()
-```
-
-KDE (Kernel density estimation) de una sola variable
-
-```{python fig.height=15, fig.width=15, message=FALSE, warning=FALSE}
-sns.histplot(X[:, 1], bins=10, kde=True, stat="density")
-plt.show()
-```
-
-Realizamos grafico de dispersion
-
-```{python}
-#Scatterplot donde salen también histogramas
-
-
-sns.jointplot(
-    x='sepal length (cm)',
-    y='sepal width (cm)',
-    data=iris,
-    kind='scatter',   # (opcional: 'scatter', 'kde', 'hex', etc.)
-    color='steelblue'
-)
-plt.show()
-```
-
-Creamos graficos de pares
-
-```{python fig.height=15, fig.width=15, message=FALSE, warning=FALSE}
-# Scatterplot matrix (kde en la diagonal)
-sns.pairplot(iris_num,hue='Species')
-plt.show()
-```
-
-Venos otro tipo de grafico de la desnidad de kernel
-
-```{python fig.height=15, fig.width=15, message=FALSE, warning=FALSE}
-# Otra forma de cargar los datos IRIS (con seaborn - sns)
-iris = sns.load_dataset("iris")
-print(iris.head()) # no tiene variable Id, las demas vbles se llaman diferentes y las categorias tambien
-```
-
-Densidad de kernel bimidensional
-
-```{python fig.height=15, fig.width=15, message=FALSE, warning=FALSE}
-# Densidad kernel bidimensional
-
-
-# Subconjuntos
-setosa = iris[iris.species == "setosa"]
-virginica = iris[iris.species == "virginica"]
-
-# Gráfico
-sns.kdeplot(x=setosa.sepal_length, y=setosa.sepal_width, cmap="Reds", fill=True, alpha=0.5)
-sns.kdeplot(x=virginica.sepal_length, y=virginica.sepal_width, cmap="Blues", fill=True, alpha=0.5)
-
-plt.xlabel("Sepal Length")
-plt.ylabel("Sepal Width")
-plt.title("Distribución de Setosa vs Virginica")
-plt.show()
-
-```
-
-Graficamos matriz de covarianza numerica
-
-```{python fig.height=15, fig.width=15, message=FALSE, warning=FALSE}
-
-
-# Cargar el dataset iris y convertir a DataFrame
-iris_bunch = load_iris()
-iris = pd.DataFrame(iris_bunch.data, columns=iris_bunch.feature_names)
-
-# Matriz de correlación
-correlation_matrix = iris.corr()
-
-# Graficar heatmap
-plt.figure(figsize=(10, 10))
-ax = sns.heatmap(
-    correlation_matrix,
-    vmin=-1, vmax=1, center=0,
-    cmap="GnBu", annot=True, fmt=".2f",
-    square=True, cbar_kws={"shrink": 0.8},
-    linewidths=0.5, linecolor='white'
-)
-
-# Corregir desalineación visual (el bug común en seaborn/matplotlib)
-bottom, top = ax.get_ylim()
-ax.set_ylim(top + 0.5, bottom - 0.5)
-
-plt.show()
-
-
-```
-
-Grafico de coordenadas paralelas
-
-```{python fig.height=15, fig.width=15, message=FALSE, warning=FALSE}
-
-
-# Cargar el dataset iris
-iris_bunch = load_iris()
-iris = pd.DataFrame(iris_bunch.data, columns=iris_bunch.feature_names)
-iris["species"] = pd.Categorical.from_codes(iris_bunch.target, iris_bunch.target_names)
-
-# Escalar variables numéricas
-scaler = MinMaxScaler()
-iris_scaled = pd.DataFrame(scaler.fit_transform(iris.iloc[:, :-1]), columns=iris.columns[:-1])
-iris_scaled["species"] = iris["species"]
-
-# Graficar coordenadas paralelas
-plt.figure(figsize=(10, 6))
-parallel_coordinates(iris_scaled, "species", colormap='cool')
-plt.show()
-
-```
-
-Grafico de Andrews
-
-```{python fig.height=15, fig.width=15, message=FALSE, warning=FALSE}
-#Curvas de Andrews
-
-andrews_curves(iris,"species",colormap='rainbow')
-plt.show()
-```
-
-Finalmente, ilustramos un grafico radial
-
-```{python fig.height=15, fig.width=15, message=FALSE, warning=FALSE}
-#Grafico Radial
-new_iris=iris.drop('species',axis=1)
-print(new_iris.head()) # le quitamos la variable species
-categories = list(iris)[:4]
-N = len(categories)
-angles = [ n / float(N)*2*pi for n in range(N)]
-angles = angles + angles[:1]
-plt.figure(figsize = (10,10))
-ax = plt.subplot(111,polar = True)
-ax.set_theta_offset(pi/2)
-ax.set_theta_direction(-1)
-plt.xticks(angles[:-1],categories)
-ax.set_rlabel_position(0)
-plt.yticks([0,2,4,6],["0","2","4","6"],color= "red", size = 7)
-plt.ylim(0,6)
-
-values = new_iris.loc[0].values.flatten().tolist()
-values = values + values[:1]
-ax.plot(angles,values,linewidth = 1,linestyle="solid",label='setosa' )
-ax.fill(angles,values,"b",alpha=0.1)
-
-
-values = new_iris.loc[79].values.flatten().tolist()
-values = values + values[:1]
-ax.plot(angles,values,linewidth = 1,linestyle="solid",label='versicolor' )
-ax.fill(angles,values,"orange",alpha=0.1)
-
-
-values = new_iris.loc[149].values.flatten().tolist()
-values = values + values[:1]
-ax.plot(angles,values,linewidth = 1,linestyle="solid",label='virginica' )
-ax.fill(angles,values,"green",alpha=0.1)
-
-plt.legend(loc = "upper left",bbox_to_anchor = (0.1,0.1))
-plt.show()
-```
-
 # 2) Variables multivariantes
 
 **Definicion**
@@ -974,86 +609,27 @@ cat("Suma: ", esperanza_cond + var_esperanzas, "\n")
 
 ```
 
-## 2.6) Codigo ilustrativo en Python:
+## 2.6) Codigo ilustrativo en R
 
-```{python fig.height=15, fig.width=15, message=FALSE, warning=FALSE}
+```{r fig.height=10, fig.width=12, message=FALSE, warning=FALSE}
+df <- mtcars
+df$modelo <- rownames(mtcars)
+df$cyl <- factor(df$cyl)
+GGally::ggpairs(df[, c("mpg", "hp", "wt", "qsec")])
 
+ggplot(df, aes(x = mpg, y = hp)) + geom_bin_2d(bins = 15) + labs(title = "Distribucion conjunta: mpg vs hp") + theme_minimal()
+ggplot(df, aes(x = cyl, y = mpg, fill = cyl)) + geom_boxplot(show.legend = FALSE) + labs(title = "Distribucion condicional de mpg dado cyl") + theme_minimal()
+ggplot(df, aes(x = wt, y = qsec, color = cyl)) + geom_point(size = 3) + labs(title = "Relacion entre peso y tiempo de cuarto de milla") + theme_minimal()
 
-# 1. Cargar y limpiar dataset
-from pydataset import data  # mtcars está disponible en pydataset
-df = data('mtcars').copy()
-df['modelo'] = df.index
-df = df.reset_index(drop=True)
-df['cyl'] = df['cyl'].astype(str)  # tratamos cyl como categórica (como factor)
+set.seed(123)
+N <- 10000
+enfermedad <- rbinom(N, 1, 0.05)
+test_positivo <- ifelse(enfermedad == 1, rbinom(N, 1, 0.9), rbinom(N, 1, 0.1))
+mean(enfermedad[test_positivo == 1])
 
-# 2. Variables multivariantes - gráfico de pares
-sns.pairplot(df[['mpg', 'hp', 'wt', 'qsec']])
-plt.suptitle("Gráfico de pares: Variables multivariantes", y=1.02)
-plt.show()
-
-# 3. Función de distribución conjunta: mpg vs hp
-plt.figure(figsize=(8, 6))
-hb = plt.hist2d(df['mpg'], df['hp'], bins=15, cmap='Blues')
-plt.colorbar(hb[3])
-plt.xlabel('Millas por galón (mpg)')
-plt.ylabel('Caballos de fuerza (hp)')
-plt.title('Distribución conjunta: mpg vs hp')
-plt.show()
-
-# 4. Distribución condicional: Boxplot de mpg según cyl
-plt.figure(figsize=(8, 6))
-sns.boxplot(x='cyl', y='mpg', data=df, palette="Set2")
-plt.title("Distribución condicional de mpg dado cyl")
-plt.xlabel("Cilindros")
-plt.ylabel("Millas por galón (mpg)")
-plt.show()
-
-# 5. Independencia: scatterplot de wt vs qsec por cyl
-plt.figure(figsize=(8, 6))
-sns.scatterplot(x='wt', y='qsec', hue='cyl', data=df, s=100)
-plt.title("¿Hay independencia entre peso (wt) y tiempo 1/4 milla (qsec)?")
-plt.xlabel("Peso (wt)")
-plt.ylabel("Tiempo 1/4 milla (qsec)")
-plt.show()
-
-# 6. Teorema de Bayes - simulación simple
-np.random.seed(123)
-N = 10000
-enfermedad = np.random.binomial(1, 0.05, N)
-test_positivo = np.where(enfermedad == 1,
-                         np.random.binomial(1, 0.9, N),
-                         np.random.binomial(1, 0.1, N))
-personas = pd.DataFrame({'enfermedad': enfermedad, 'test_positivo': test_positivo})
-
-# P(enfermedad | test positivo)
-bayes_prob = personas[personas['test_positivo'] == 1]['enfermedad'].mean()
-print(f"P(enfermedad | test positivo) ≈ {bayes_prob:.4f}")
-
-# 7. Valor esperado, covarianza y correlación
-valor_esperado_mpg = df['mpg'].mean()
-var_hp = df['hp'].var()
-cov_mpg_hp = df[['mpg', 'hp']].cov().iloc[0, 1]
-cor_mpg_hp = df[['mpg', 'hp']].corr().iloc[0, 1]
-
-print(f"Valor esperado de mpg: {valor_esperado_mpg:.2f}")
-print(f"Varianza de hp: {var_hp:.2f}")
-print(f"Covarianza mpg-hp: {cov_mpg_hp:.2f}")
-print(f"Correlación mpg-hp: {cor_mpg_hp:.2f}")
-
-# 8. Esperanza condicional y ley de varianza total
-cond_stats = df.groupby('cyl').agg(media_mpg=('mpg', 'mean'), varianza_mpg=('mpg', 'var')).reset_index()
-
-var_total = df['mpg'].var()
-esperanza_cond = cond_stats['varianza_mpg'].mean()
-var_esperanzas = cond_stats['media_mpg'].var()
-
-print(f"\nVarianza total: {var_total:.4f}")
-print(f"E[Var(Y|X)]: {esperanza_cond:.4f}")
-print(f"Var(E[Y|X]): {var_esperanzas:.4f}")
-print(f"Suma (E[Var(Y|X)] + Var(E[Y|X])): {esperanza_cond + var_esperanzas:.4f}")
-
+c(valor_esperado_mpg = mean(df$mpg), varianza_hp = var(df$hp), covarianza_mpg_hp = cov(df$mpg, df$hp), correlacion_mpg_hp = cor(df$mpg, df$hp))
+aggregate(mpg ~ cyl, df, function(x) c(media = mean(x), varianza = var(x)))
 ```
-
 # 3) Distribución multivariante
 
 ## 3.1) Distribucion normal multivariante
@@ -1634,128 +1210,45 @@ plot(u_clayton, main = "Cópula de Clayton (θ = 3)",
 
 ```
 
-## 3.8) Ejemplo con python
+## 3.8) Ejemplo en R
 
-```{python}
+```{r fig.height=10, fig.width=12, message=FALSE, warning=FALSE}
+set.seed(42)
+mu <- 50; sigma <- 10
+x <- seq(mu - 4 * sigma, mu + 4 * sigma, length.out = 1000)
+x_std <- seq(-4, 4, length.out = 1000)
+plot(x, dnorm(x, mu, sigma), type = "l", col = "blue", lwd = 2, main = "Distribucion normal univariante y estandar", xlab = "x", ylab = "Densidad")
+lines(x_std * sigma + mu, dnorm(x_std) / sigma, col = "red", lwd = 2, lty = 2)
+legend("topright", legend = c("N(50,10)", "N(0,1) reescalada"), col = c("blue", "red"), lty = c(1, 2), bty = "n")
 
+X_val <- 70
+Z <- (X_val - mu) / sigma
+c(puntaje_z = Z, recuperado = Z * sigma + mu, transformacion_lineal = 2 * X_val + 5)
 
-# Configuración general
-sns.set(style="whitegrid")
-np.random.seed(42)
+Sigma <- matrix(c(1, 0.8, 0.8, 1), 2)
+datos_biv <- MASS::mvrnorm(1000, mu = c(0, 0), Sigma = Sigma)
+plot(datos_biv, pch = 19, col = scales::alpha("steelblue", 0.35), asp = 1, main = "Curvas de nivel - normal bivariada", xlab = "X", ylab = "Y")
+contour(MASS::kde2d(datos_biv[, 1], datos_biv[, 2]), add = TRUE, col = "darkgreen", lwd = 2)
 
-# 1. Distribución normal univariante vs estándar
-mu, sigma = 50, 10
-x = np.linspace(mu - 4*sigma, mu + 4*sigma, 1000)
-x_std = np.linspace(-4, 4, 1000)
-pdf = norm.pdf(x, mu, sigma)
-pdf_std = norm.pdf(x_std)
+A <- c(2, 3); B <- c(7, 6)
+dist_euclidiana <- sqrt(sum((B - A)^2))
+plot(rbind(A, B), xlim = c(0, 10), ylim = c(0, 10), pch = 19, col = c("blue", "green"), asp = 1, main = "Distancia euclidiana entre A y B", xlab = "X", ylab = "Y")
+segments(A[1], A[2], B[1], B[2], col = "red", lwd = 2, lty = 2)
+text(mean(c(A[1], B[1])), mean(c(A[2], B[2])) + 0.5, paste("Distancia =", round(dist_euclidiana, 2)))
 
-plt.figure(figsize=(8, 4))
-plt.plot(x, pdf, label="N(50,10)", color="blue")
-plt.plot(x_std*sigma + mu, pdf_std, '--', label="N(0,1) reescalada", color="red")
-plt.title("Distribución Normal Univariante y Estándar")
-plt.xlabel("x")
-plt.ylabel("Densidad")
-plt.legend()
-plt.grid(True)
-plt.tight_layout()
-plt.show()
+iris3 <- as.matrix(iris[, 1:3])
+mahal_dist <- sqrt(mahalanobis(iris3, colMeans(iris3), cov(iris3)))
+eucl_dist <- sqrt(rowSums((sweep(iris3, 2, colMeans(iris3)))^2))
+umbral <- sqrt(qchisq(0.95, df = 3))
+df_dist <- data.frame(Euclidiana = eucl_dist, Mahalanobis = mahal_dist, Atipico = mahal_dist > umbral)
+ggplot(df_dist, aes(x = Euclidiana, y = Mahalanobis, color = Atipico)) + geom_point() + geom_hline(yintercept = umbral, linetype = 2, color = "red") + labs(title = "Distancia Mahalanobis vs Euclidiana") + theme_minimal()
 
-# Estandarización y transformaciones
-X = 70
-Z = (X - mu) / sigma
-X_inv = Z * sigma + mu
-X_linear = 2 * X + 5
-
-print("Puntaje Z:", Z)
-print("Recuperado desde Z:", X_inv)
-print("Transformación lineal (2X + 5):", X_linear)
-
-# 2. Curvas de nivel de una normal bivariada
-mean = [0, 0]
-cov = [[1, 0.8], [0.8, 1]]
-data = np.random.multivariate_normal(mean, cov, 1000)
-df = pd.DataFrame(data, columns=["X", "Y"])
-
-sns.kdeplot(data=df, x="X", y="Y", fill=True, thresh=0.01, levels=10, cmap="viridis")
-plt.scatter(df["X"], df["Y"], s=5, alpha=0.3, color="blue")
-plt.title("Curvas de Nivel - Normal Bivariada")
-plt.xlabel("X")
-plt.ylabel("Y")
-plt.axis("equal")
-plt.tight_layout()
-plt.show()
-
-# 3. Distancia Euclidiana
-A = np.array([2, 3])
-B = np.array([7, 6])
-dist = np.linalg.norm(B - A)
-
-plt.figure(figsize=(6, 6))
-plt.plot([A[0], B[0]], [A[1], B[1]], 'r--', lw=2)
-plt.scatter(*A, color="blue", s=100, label="A")
-plt.scatter(*B, color="green", s=100, label="B")
-plt.text((A[0]+B[0])/2, (A[1]+B[1])/2+0.5, f"Distancia Euclidiana = {dist:.2f}", ha="center")
-plt.xlim(0, 10)
-plt.ylim(0, 10)
-plt.legend()
-plt.grid(True)
-plt.title("Distancia Euclidiana entre A y B")
-plt.tight_layout()
-plt.show()
-
-# 4. Distancia de Mahalanobis
-iris = load_iris()
-X_iris = iris.data[:, :3]
-mu_iris = np.mean(X_iris, axis=0)
-S_iris = np.cov(X_iris.T)
-
-mahal_dist = [mahalanobis(x, mu_iris, np.linalg.inv(S_iris)) for x in X_iris]
-eucl_dist = [np.linalg.norm(x - mu_iris) for x in X_iris]
-mahal_dist = np.array(mahal_dist)
-eucl_dist = np.array(eucl_dist)
-
-threshold = np.sqrt(chi2.ppf(0.95, df=3))
-outliers = mahal_dist > threshold
-
-df_iris = pd.DataFrame({
-    "Mahalanobis": mahal_dist,
-    "Euclidean": eucl_dist,
-    "Outlier": outliers
-})
-
-plt.figure(figsize=(8, 5))
-sns.scatterplot(data=df_iris, x="Euclidean", y="Mahalanobis", hue="Outlier", palette={False: "black", True: "red"})
-plt.axhline(threshold, linestyle="--", color="red", label=f"Umbral χ² (95%) = {threshold:.2f}")
-plt.legend()
-plt.title("Distancia Mahalanobis vs Euclidiana")
-plt.tight_layout()
-plt.show()
-
-# 5. Comparación Normal vs t multivariadas
-mu = np.array([0, 0])
-Sigma = np.array([[1, 0.7], [0.7, 1]])
-n = 1000
-df_t = 3
-
-t_data = multivariate_t.rvs(loc=mu, shape=Sigma, df=df_t, size=n)
-norm_data = np.random.multivariate_normal(mu, Sigma, size=n)
-
-t_df = pd.DataFrame(t_data, columns=["X1", "X2"])
-t_df["Distribución"] = "t-Student"
-
-norm_df = pd.DataFrame(norm_data, columns=["X1", "X2"])
-norm_df["Distribución"] = "Normal"
-
-all_df = pd.concat([t_df, norm_df])
-
-sns.scatterplot(data=all_df, x="X1", y="X2", hue="Distribución", alpha=0.5)
-plt.title("Comparación: Normal vs t-Student multivariadas")
-plt.tight_layout()
-plt.show()
-
+norm_data <- MASS::mvrnorm(1000, mu = c(0, 0), Sigma = matrix(c(1, 0.7, 0.7, 1), 2))
+t_data <- mvtnorm::rmvt(1000, sigma = matrix(c(1, 0.7, 0.7, 1), 2), df = 3)
+comp <- rbind(data.frame(norm_data, Distribucion = "Normal"), data.frame(t_data, Distribucion = "t-Student"))
+names(comp)[1:2] <- c("X1", "X2")
+ggplot(comp, aes(x = X1, y = X2, color = Distribucion)) + geom_point(alpha = 0.45) + labs(title = "Comparacion: normal vs t-Student multivariadas") + theme_minimal()
 ```
-
 # 4) Inferencia multivariante
 
 La **estadística inferencial multivariante** es una rama de la estadística que permite hacer inferencias o generalizaciones sobre una población a partir de muestras, considerando **más de una variable al mismo tiempo**. A diferencia de la estadística univariante o bivariante, que analiza una o dos variables por separado, la multivariante busca entender **cómo se relacionan varias variables entre sí y cómo esas relaciones afectan un fenómeno o resultado**. Su objetivo no es solo describir los datos observados, sino **estimar parámetros poblacionales, contrastar hipótesis y predecir comportamientos**, considerando la interacción conjunta de las variables.
@@ -2154,151 +1647,44 @@ donde $\mathbf{W}$ es la matriz de sumas de cuadrados y productos dentro de los 
 
 Este tipo de prueba es útil en contextos como psicología, medicina o economía, donde se mide a varios grupos en varias dimensiones simultáneamente. Por ejemplo, comparar distintos métodos de enseñanza evaluando múltiples habilidades académicas en estudiantes.
 
-## 4.9) Ejemplo con python
+## 4.9) Ejemplo en R
 
+```{r fig.height=10, fig.width=12, message=FALSE, warning=FALSE}
+df_iris <- iris[, 1:4]
+colMeans(df_iris); cov(df_iris); cor(df_iris)
+GGally::ggpairs(df_iris)
 
+set.seed(123)
+mu <- c(3, 7); Sigma <- matrix(c(1, 0.8, 0.8, 2), 2); n <- 50; reps <- 1000
+sample_means <- replicate(reps, colMeans(MASS::mvrnorm(n, mu, Sigma)))
+df_means <- data.frame(t(sample_means)); names(df_means) <- c("X1", "X2")
+ggplot(df_means, aes(X1, X2)) + geom_point(alpha = 0.25, color = "steelblue") + stat_density_2d(color = "red") + labs(title = paste("Distribucion de", reps, "medias muestrales con n =", n)) + theme_minimal()
 
-```{python}
+set.seed(123)
+datos_univ <- rnorm(100, mean = 5, sd = 2)
+log_verosimilitud <- function(mu, datos, sigma) sum(dnorm(datos, mean = mu, sd = sigma, log = TRUE))
+mu_vals <- seq(3, 7, length.out = 200)
+ll_vals <- vapply(mu_vals, log_verosimilitud, numeric(1), datos = datos_univ, sigma = 2)
+mu_mle <- mu_vals[which.max(ll_vals)]
+plot(mu_vals, ll_vals, type = "l", col = "steelblue", lwd = 2, main = "Log-verosimilitud para distintos valores de mu", xlab = "mu", ylab = "Log-verosimilitud")
+abline(v = mu_mle, col = "red", lty = 2); points(mu_mle, max(ll_vals), col = "red", pch = 19)
 
-# 4.1) Estadísticos muestrales multivariantes
-iris = load_iris()
-df_iris = pd.DataFrame(iris.data, columns=iris.feature_names)
+mu_mle <- mean(datos_univ); sigma_mle <- sqrt(mean((datos_univ - mu_mle)^2))
+hist(datos_univ, breaks = 30, probability = TRUE, col = "lightblue", border = "white", main = "Estimacion por maxima verosimilitud", xlab = "Datos simulados")
+curve(dnorm(x, mu_mle, sigma_mle), add = TRUE, col = "red", lwd = 2)
 
-print("Vector de medias muestral:")
-print(df_iris.mean())
+set.seed(123)
+X_hot <- MASS::mvrnorm(30, mu = c(5, 10), Sigma = matrix(c(1, 0.8, 0.8, 1), 2))
+ICSNP::HotellingsT2(X_hot, mu = c(5, 10))
 
-print("\nMatriz de covarianzas:")
-print(df_iris.cov())
+data_mv <- MASS::mvrnorm(50, mu = c(2, 3), Sigma = matrix(c(1, 0.5, 0.5, 2), 2))
+ICSNP::HotellingsT2(data_mv, mu = c(2, 3))
 
-print("\nMatriz de correlaciones:")
-print(df_iris.corr())
-
-sns.pairplot(df_iris)
-plt.suptitle("Gráfico de dispersión multivariado - Dataset Iris", y=1.02)
-plt.show()
-
-# 4.2) Teorema central del límite multivariante
-np.random.seed(123)
-mu = np.array([3, 7])
-Sigma = np.array([[1, 0.8], [0.8, 2]])
-n = 50
-reps = 1000
-
-samples = np.random.multivariate_normal(mu, Sigma, size=(reps, n))
-sample_means = samples.mean(axis=1)
-
-df_means = pd.DataFrame(sample_means, columns=["X1", "X2"])
-sns.scatterplot(data=df_means, x="X1", y="X2", alpha=0.3, color="steelblue")
-sns.kdeplot(data=df_means, x="X1", y="X2", levels=5, color="red")
-plt.title(f"Distribución de medias muestrales bivariadas\nSimulación de {reps} medias muestrales con n = {n}")
-plt.xlabel("Media muestral de X1")
-plt.ylabel("Media muestral de X2")
-plt.show()
-
-# 4.3) Máxima verosimilitud
-np.random.seed(123)
-n = 100
-mu_true = 5
-sigma_true = 2
-data = np.random.normal(mu_true, sigma_true, n)
-
-def log_likelihood(mu, data, sigma):
-    n = len(data)
-    return -n/2 * np.log(2 * np.pi * sigma**2) - np.sum((data - mu)**2) / (2 * sigma**2)
-
-mu_vals = np.linspace(3, 7, 200)
-ll_vals = [log_likelihood(mu, data, sigma_true) for mu in mu_vals]
-mu_mle = mu_vals[np.argmax(ll_vals)]
-
-plt.plot(mu_vals, ll_vals, color="steelblue")
-plt.axvline(mu_mle, color="red", linestyle="--")
-plt.scatter(mu_mle, max(ll_vals), color="red")
-plt.title("Log-verosimilitud para distintos valores de μ")
-plt.xlabel("μ")
-plt.ylabel("Log-verosimilitud")
-plt.show()
-
-# 4.4) Estimadores MLE para una normal
-mu_mle = np.mean(data)
-sigma2_mle = np.mean((data - mu_mle)**2)
-sigma_mle = np.sqrt(sigma2_mle)
-
-plt.hist(data, bins=30, density=True, alpha=0.7, color="lightblue", edgecolor="black")
-x_vals = np.linspace(min(data), max(data), 100)
-plt.plot(x_vals, norm.pdf(x_vals, mu_mle, sigma_mle), color="red", linewidth=2)
-plt.title("Estimación por máxima verosimilitud")
-plt.xlabel("Datos simulados")
-plt.ylabel("Densidad")
-plt.show()
-
-# 4.5) Test de hipótesis multivariante (Hotelling T²)
-np.random.seed(123)
-n = 30
-mu = np.array([5, 10])
-Sigma = np.array([[1, 0.8], [0.8, 1]])
-X = np.random.multivariate_normal(mu, Sigma, n)
-X_bar = np.mean(X, axis=0)
-S = np.cov(X, rowvar=False)
-mu0 = np.array([5, 10])
-diff = X_bar - mu0
-T2 = n * diff.T @ np.linalg.inv(S) @ diff
-p = X.shape[1]
-F_stat = ((n - p) / (p * (n - 1))) * T2
-p_value = 1 - chi2.cdf(T2, p)
-
-print(f"Estadístico T²: {T2}")
-print(f"Estadístico F: {F_stat}")
-print(f"Valor p: {p_value}")
-
-plt.scatter(X[:, 0], X[:, 1], alpha=0.6, color="blue")
-plt.scatter(*mu0, color="red", s=100, marker="x")
-plt.scatter(*X_bar, color="green", s=100, marker="D")
-plt.title(f"Test de Hotelling T²\nT² = {round(T2, 2)}, p-valor = {round(p_value, 4)}")
-plt.xlabel("Variable 1")
-plt.ylabel("Variable 2")
-plt.show()
-
-# 4.6) Contraste para la media de una normal multivariante
-np.random.seed(123)
-n = 50
-mu = np.array([2, 3])
-Sigma = np.array([[1, 0.5], [0.5, 2]])
-data_mv = np.random.multivariate_normal(mu, Sigma, n)
-mu0 = np.array([2, 3])
-X_bar = np.mean(data_mv, axis=0)
-S = np.cov(data_mv, rowvar=False)
-diff = X_bar - mu0
-T2 = n * diff.T @ np.linalg.inv(S) @ diff
-p = data_mv.shape[1]
-p_value = 1 - chi2.cdf(T2, p)
-
-print(f"Hotelling T²: {T2}, p-valor: {p_value}")
-
-plt.scatter(data_mv[:, 0], data_mv[:, 1], alpha=0.6, color="steelblue")
-plt.scatter(*mu0, color="red", s=100, marker="x")
-plt.scatter(*X_bar, color="green", s=100, marker="D")
-plt.title("Elipse de confianza del 95% para la media multivariada")
-plt.xlabel("Variable 1")
-plt.ylabel("Variable 2")
-plt.show()
-
-# 4.7) Contraste para la matriz de covarianza
-np.random.seed(123)
-mu = np.array([0, 0, 0])
-Sigma = np.array([[1, 0.5, 0.3], [0.5, 1, 0.4], [0.3, 0.4, 1]])
-data_cov = np.random.multivariate_normal(mu, Sigma, 100)
-bartlett_test = bartlett(*data_cov.T)
-print("Test de esfericidad de Bartlett:")
-print(bartlett_test)
-
-# 4.8) Contraste de igualdad de varias medias (MANOVA)
-df_manova = pd.DataFrame(data_cov, columns=["X1", "X2", "X3"])
-df_manova["Group"] = ["A"] * 50 + ["B"] * 50
-maov = MANOVA.from_formula("X1 + X2 + X3 ~ Group", data=df_manova)
-print(maov.mv_test())
-
+data_cov <- MASS::mvrnorm(100, mu = c(0, 0, 0), Sigma = matrix(c(1, 0.5, 0.3, 0.5, 1, 0.4, 0.3, 0.4, 1), 3))
+psych::cortest.bartlett(cor(data_cov), n = nrow(data_cov))
+df_manova <- data.frame(data_cov, Grupo = factor(rep(c("A", "B"), each = 50)))
+summary(manova(cbind(X1, X2, X3) ~ Grupo, data = df_manova), test = "Wilks")
 ```
-
 # 5) Análisis con componentes principales
 
 El Análisis con Componentes Principales (PCA, por sus siglas en inglés) es una técnica estadística que transforma un conjunto de variables posiblemente correlacionadas en un nuevo conjunto de variables no correlacionadas llamadas componentes principales. Cada componente principal es una combinación lineal de las variables originales, y se ordenan de manera que el primer componente ($PC_1$) capture la mayor varianza posible de los datos, el segundo ($PC_2$) capture la mayor varianza restante, y así sucesivamente. Matemáticamente, si tenemos una matriz de datos $X$ (centrada), el PCA se basa en descomponer su matriz de covarianzas $\Sigma$ en valores y vectores propios, de modo que $\Sigma v_k = \lambda_k v_k$, donde $v_k$ es el vector propio y $\lambda_k$ su varianza asociada.
@@ -2488,92 +1874,26 @@ factoextra::fviz_pca_biplot(
 
 ```
 
-## 5.4) Ejemplo en python
+## 5.4) Ejemplo en R
 
-```{python}
+```{r fig.height=10, fig.width=12, message=FALSE, warning=FALSE}
+set.seed(123)
+n <- 100
+x1 <- rnorm(n, 5, 2); x2 <- 0.5 * x1 + rnorm(n); x3 <- -0.3 * x1 + 0.8 * x2 + rnorm(n, 0, 0.5)
+datos_pca <- data.frame(X1 = x1, X2 = x2, X3 = x3)
+plotly::plot_ly(datos_pca, x = ~X1, y = ~X2, z = ~X3, type = "scatter3d", mode = "markers") |> plotly::layout(title = "Datos originales en 3D")
 
-# Semilla de reproducibilidad
-np.random.seed(123)
+pca_sim <- prcomp(datos_pca, scale. = TRUE)
+var_exp <- pca_sim$sdev^2 / sum(pca_sim$sdev^2)
+df_var <- data.frame(Componente = paste0("PC", seq_along(var_exp)), Varianza = var_exp)
+ggplot(df_var, aes(x = Componente, y = Varianza)) + geom_col(fill = "skyblue") + geom_text(aes(label = round(Varianza, 2)), vjust = -0.4) + labs(title = "Varianza explicada por componente", y = "Proporcion de varianza") + theme_minimal()
 
-# ===============================
-# 1. Generar datos simulados
-# ===============================
-n = 100
-x1 = np.random.normal(5, 2, n)
-x2 = 0.5 * x1 + np.random.normal(0, 1, n)
-x3 = -0.3 * x1 + 0.8 * x2 + np.random.normal(0, 0.5, n)
+ggplot(as.data.frame(pca_sim$x), aes(x = PC1, y = PC2)) + geom_point(color = "red", alpha = 0.7) + labs(title = "Proyeccion en los dos primeros componentes principales") + theme_minimal()
 
-datos = pd.DataFrame({"X1": x1, "X2": x2, "X3": x3})
-
-# ===============================
-# 2. Gráfico 3D datos originales
-# ===============================
-fig3d = px.scatter_3d(datos, x="X1", y="X2", z="X3",
-                      opacity=0.7, color_discrete_sequence=["blue"])
-fig3d.update_traces(marker=dict(size=4))
-fig3d.update_layout(title="Datos originales en 3D")
-fig3d.show()
-
-# ===============================
-# 3. PCA
-# ===============================
-scaler = StandardScaler()
-datos_scaled = scaler.fit_transform(datos)
-
-pca = PCA()
-pca.fit(datos_scaled)
-
-# Varianza explicada
-var_exp = pca.explained_variance_ratio_
-df_var = pd.DataFrame({
-    "Componente": [f"PC{i+1}" for i in range(len(var_exp))],
-    "Varianza": var_exp
-})
-
-# Scree plot
-plt.figure(figsize=(6,4))
-sns.barplot(x="Componente", y="Varianza", data=df_var, color="skyblue")
-for i, v in enumerate(var_exp):
-    plt.text(i, v + 0.01, f"{v:.2f}", ha="center")
-plt.title("Varianza explicada por componente")
-plt.ylabel("Proporción de varianza")
-plt.show()
-
-# ===============================
-# 4. Proyección en los dos primeros PCs
-# ===============================
-scores = pca.transform(datos_scaled)
-plt.figure(figsize=(6,4))
-sns.scatterplot(x=scores[:,0], y=scores[:,1], color="red", alpha=0.7)
-plt.xlabel("PC1")
-plt.ylabel("PC2")
-plt.title("Proyección en los dos primeros componentes principales")
-plt.show()
-
-# ===============================
-# 5. Maldición de la dimensionalidad
-# ===============================
-dimensiones = range(1, 51)
-distancias_rel = []
-
-for p in dimensiones:
-    datos_hd = np.random.rand(n, p)
-    d = pdist(datos_hd)
-    d_min = np.min(d)
-    d_max = np.max(d)
-    distancias_rel.append((d_max - d_min) / d_min)
-
-df_md = pd.DataFrame({"Dimensiones": dimensiones,
-                      "DifRelativa": distancias_rel})
-
-plt.figure(figsize=(6,4))
-sns.lineplot(x="Dimensiones", y="DifRelativa", data=df_md, color="darkgreen")
-plt.title("Maldición de la dimensionalidad")
-plt.ylabel("Diferencia relativa entre distancias")
-plt.show()
-
+dimensiones <- 1:50
+distancias_rel <- vapply(dimensiones, function(p) { datos_hd <- matrix(runif(n * p), nrow = n); d <- dist(datos_hd); (max(d) - min(d)) / min(d) }, numeric(1))
+ggplot(data.frame(Dimensiones = dimensiones, DifRelativa = distancias_rel), aes(Dimensiones, DifRelativa)) + geom_line(color = "darkgreen", linewidth = 1) + labs(title = "Maldicion de la dimensionalidad", y = "Diferencia relativa entre distancias") + theme_minimal()
 ```
-
 # 6) Análisis factorial
 
 El análisis factorial es una técnica estadística multivariante que busca identificar factores latentes (variables no observadas) que explican la correlación entre un conjunto de variables observadas. Matemáticamente, se asume que cada variable observada $x_i$ puede expresarse como una combinación lineal de factores comunes $F_j$ más un término de error:
@@ -3084,119 +2404,16 @@ ggplot() +
   theme_minimal(base_size = 12)
 ```
 
-## 6.7) Ejemplo con Python
+## 6.7) Ejemplo en R
 
-```{r include=FALSE}
-bfi_items_py <- psych::bfi[, 1:25]
-bfi_items_py <- stats::na.omit(bfi_items_py)
+```{r fig.height=10, fig.width=12, message=FALSE, warning=FALSE}
+bfi_items_r <- na.omit(psych::bfi[, 1:25])
+fa_r <- psych::fa(scale(bfi_items_r), nfactors = 5, rotate = "oblimin", fm = "ml", scores = "Bartlett")
+print(fa_r$loadings, cutoff = 0.30)
+fa_r$communality
+fa_r$uniquenesses
+psych::fa.diagram(fa_r, main = "Diagrama simplificado del modelo factorial")
 ```
-
-```{python}
-# ===========================
-# Análisis Factorial en Python
-# ===========================
-
-# ---------- 1) Datos ----------
-# Usamos el dataset "bfi" de personalidad desde R psych::bfi.
-# Así evitamos depender de OpenML durante el render.
-df = r.bfi_items_py.copy()  # ítems A1:A5, C1:C5, E1:E5, N1:N5, O1:O5
-df = df.apply(pd.to_numeric, errors="coerce").dropna()
-n, p = df.shape
-print(f"Observaciones: {n}, Variables: {p}")
-
-# Estandarizamos (factor_analyzer lo recomienda)
-scaler = StandardScaler()
-df_std = scaler.fit_transform(df)
-
-# ---------- 2) Correlaciones, KMO y Bartlett ----------
-corr = np.corrcoef(df_std, rowvar=False)
-
-plt.figure(figsize=(10, 8))
-sns.heatmap(corr, cmap="coolwarm", center=0)
-plt.title("Mapa de calor de correlaciones (agrupadas)")
-plt.show()
-
-chi2, p_value = calculate_bartlett_sphericity(df_std)
-print("==> Bartlett test: chi2 =", chi2, "p =", p_value)
-
-kmo_all, kmo_model = calculate_kmo(df_std)
-print("==> KMO general:", round(kmo_model, 3))
-
-# ---------- 3) Número de factores: Scree + Análisis paralelo ----------
-fa = FactorAnalyzer(rotation=None)
-fa.fit(df_std)
-
-ev, v = fa.get_eigenvalues()
-
-plt.figure(figsize=(8, 5))
-plt.scatter(range(1, df_std.shape[1] + 1), ev)
-plt.plot(range(1, df_std.shape[1] + 1), ev)
-plt.title("Scree plot")
-plt.xlabel("Factor")
-plt.ylabel("Eigenvalue")
-plt.axhline(y=1, color="r", linestyle="--")
-plt.show()
-
-# Aquí podrías usar análisis paralelo (con fa.parallel equivalente) → librería adicional
-
-nfactors = 5   # ajusta según el gráfico o test paralelo
-print(f"Número de factores seleccionado: {nfactors}")
-
-# ---------- 4) Ajuste del modelo factorial ----------
-fa = FactorAnalyzer(n_factors=nfactors, rotation="oblimin", method="ml")
-fa.fit(df_std)
-
-loadings = pd.DataFrame(fa.loadings_, index=df.columns)
-print("\n==> Cargas factoriales (cutoff=0.30):\n", loadings.round(3))
-
-communalities = fa.get_communalities()
-uniqueness = fa.get_uniquenesses()
-print("\n==> Varianza explicada total:", sum(fa.get_factor_variance()[1]))
-print("\n==> Comunalidades y Unicidades:")
-print(pd.DataFrame({"Comunalidad": communalities, "Unicidad": uniqueness}, index=df.columns))
-
-# ---------- 5) Heatmap de cargas factoriales ----------
-plt.figure(figsize=(10, 12))
-sns.heatmap(loadings, annot=True, cmap="coolwarm", center=0, fmt=".2f")
-plt.title("Heatmap de cargas factoriales (oblimin)")
-plt.show()
-
-# ---------- 6) Puntajes factoriales ----------
-# Nota: factor_analyzer no da scores directos como en R,
-# pero podemos calcularlos por regresión aproximada.
-scores = pd.DataFrame(np.dot(df_std, fa.loadings_), columns=[f"Factor{i+1}" for i in range(nfactors)])
-
-if scores.shape[1] >= 2:
-    plt.figure(figsize=(7, 6))
-    plt.scatter(scores.iloc[:, 0], scores.iloc[:, 1], alpha=0.3, color="#2C7FB8")
-    plt.axhline(0, color="grey", linestyle="--")
-    plt.axvline(0, color="grey", linestyle="--")
-    plt.xlabel("Factor1")
-    plt.ylabel("Factor2")
-    plt.title("Dispersión de puntajes factoriales")
-    plt.show()
-
-# ---------- 7) Modelo factorial (esquema simplificado) ----------
-# Nota: Python no trae un fa.diagram() como R.
-# Aquí un diagrama sencillo de cargas > 0.3
-
-import networkx as nx
-
-G = nx.Graph()
-threshold = 0.3
-for var, row in loadings.iterrows():
-    for f, val in row.items():
-        if abs(val) >= threshold:
-            G.add_edge(var, f, weight=abs(val))
-
-pos = nx.spring_layout(G, seed=123)
-plt.figure(figsize=(12, 10))
-nx.draw(G, pos, with_labels=True, node_size=1500, node_color="lightblue", font_size=8, width=1)
-plt.title("Diagrama simplificado del modelo factorial (AFE)")
-plt.show()
-
-```
-
 # 7) Escalamiento multidimensional
 
 El escalado multidimensional (MDS, por sus siglas en inglés) es una técnica estadística que busca representar objetos o individuos en un espacio de baja dimensión (generalmente 2D o 3D) de tal manera que las distancias entre ellos en ese espacio reducido reflejen lo mejor posible sus distancias originales en un espacio de alta dimensión. Su objetivo es traducir una matriz de disimilaridades $D = (d_{ij})$ entre pares de elementos en una configuración geométrica de puntos $x_i \in \mathbb{R}^k$ que conserve esas relaciones.
@@ -3399,147 +2616,29 @@ plot(nmds, type = "t", main = "Escalado No Métrico (NMDS) - Ejemplo gráfico")
 
 ```
 
-## 7.4) Ejemplo Python
+## 7.4) Ejemplo en R
 
-### 7.4.1) Escalamiento Multidimensional (MDS clásico)
+```{r fig.height=10, fig.width=12, message=FALSE, warning=FALSE}
+ciudades <- c("Roma", "Paris", "Berlin", "Madrid", "Londres")
+distancias <- matrix(c(0,1105,1181,1365,1435,1105,0,1050,1276,343,1181,1050,0,1870,930,1365,1276,1870,0,1260,1435,343,930,1260,0), nrow = 5, byrow = TRUE, dimnames = list(ciudades, ciudades))
+coords <- cmdscale(as.dist(distancias), k = 2)
+plot(coords, pch = 19, col = "blue", main = "Escalado multidimensional clasico", xlab = "Dim 1", ylab = "Dim 2"); text(coords, labels = ciudades, pos = 4, col = "darkblue")
 
-```{python}
+dist_iris <- dist(iris[, 1:4])
+coords_iris <- cmdscale(dist_iris, k = 2)
+df_coords <- data.frame(Dim1 = coords_iris[, 1], Dim2 = coords_iris[, 2], Species = iris$Species)
+ggplot(df_coords, aes(Dim1, Dim2, color = Species)) + geom_point(alpha = 0.8) + labs(title = "Escalado metrico (PCoA) en iris") + theme_minimal()
 
+datos_4 <- matrix(c(1,1,5,2,2,4,6,5), ncol = 2, byrow = TRUE)
+D <- as.matrix(dist(datos_4)); D2 <- D^2; n4 <- nrow(D); J <- diag(n4) - matrix(1, n4, n4) / n4
+B <- -0.5 * J %*% D2 %*% J; eig <- eigen(B); coords_4 <- eig$vectors[, 1:2] %*% diag(sqrt(pmax(eig$values[1:2], 0)))
+plot(coords_4, pch = 19, col = "steelblue", asp = 1, main = "Construccion de coordenadas principales", xlab = "Coord. principal 1", ylab = "Coord. principal 2"); text(coords_4, labels = c("A", "B", "C", "D"), pos = 4)
 
-# ===============================
-# Ejemplo básico de MDS en Python
-# ===============================
-
-# 1. Distancias (en km) entre algunas ciudades
-ciudades = ["Roma", "París", "Berlín", "Madrid", "Londres"]
-distancias = np.array([
-    [0, 1105, 1181, 1365, 1435],
-    [1105, 0, 1050, 1276, 343],
-    [1181, 1050, 0, 1870, 930],
-    [1365, 1276, 1870, 0, 1260],
-    [1435, 343, 930, 1260, 0]
-])
-
-# 2. Aplicamos MDS clásico (2 dimensiones)
-mds = MDS(n_components=2, dissimilarity="precomputed", random_state=123)
-coords = mds.fit_transform(distancias)
-
-# 3. Graficamos
-plt.figure(figsize=(8,6))
-plt.scatter(coords[:,0], coords[:,1], color="blue")
-for i, ciudad in enumerate(ciudades):
-    plt.text(coords[i,0]+10, coords[i,1]+10, ciudad, fontsize=12, color="darkblue")
-plt.title("Escalado Multidimensional (MDS)", fontsize=14)
-plt.xlabel("Dim 1")
-plt.ylabel("Dim 2")
-plt.grid(True, linestyle="--", alpha=0.5)
-plt.show()
-
+set.seed(123)
+nmds <- vegan::metaMDS(iris[, 1:4], distance = "euclidean", k = 2, trymax = 50, trace = FALSE)
+df_nmds <- data.frame(NMDS1 = nmds$points[, 1], NMDS2 = nmds$points[, 2], Species = iris$Species)
+ggplot(df_nmds, aes(NMDS1, NMDS2, color = Species)) + geom_point(alpha = 0.8) + labs(title = "Escalado no metrico (NMDS) en iris") + theme_minimal()
 ```
-
-### 7.4.2) Escalados métricos: coordenadas principales (PCoA)
-
-```{python}
-
-# Dataset iris
-
-iris = load_iris()
-X = iris.data
-y = iris.target
-labels = iris.target_names
-
-# 1. Matriz de distancias euclidianas
-dist_iris = pairwise_distances(X, metric="euclidean")
-
-# 2. Escalado Métrico (PCoA) ~ se implementa con MDS "precomputed"
-pcoa = MDS(n_components=2, dissimilarity="precomputed", random_state=42)
-coords = pcoa.fit_transform(dist_iris)
-
-# Convertimos a DataFrame
-df_coords = pd.DataFrame(coords, columns=["Dim1", "Dim2"])
-df_coords["Species"] = [labels[i] for i in y]
-
-# 3. Graficamos
-plt.figure(figsize=(8,6))
-sns.scatterplot(data=df_coords, x="Dim1", y="Dim2", hue="Species", s=60, alpha=0.8)
-plt.title("Escalado Métrico (PCoA) en iris", fontsize=14)
-plt.xlabel("Coordenada Principal 1")
-plt.ylabel("Coordenada Principal 2")
-plt.show()
-
-```
-
-### 7.4.3) Construcción de las coordenadas principales
-
-```{python}
-# Ejemplo sencillo con 4 puntos en 2D
-data = np.array([
-    [1, 1],
-    [5, 2],
-    [2, 4],
-    [6, 5]
-])
-labels = ["A", "B", "C", "D"]
-
-# 1. Matriz de distancias
-D = pairwise_distances(data, metric="euclidean")
-D2 = D**2
-n = D.shape[0]
-
-# 2. Matriz de centrado J
-J = np.eye(n) - np.ones((n,n))/n
-
-# 3. Matriz B
-B = -0.5 * J.dot(D2).dot(J)
-
-# 4. Descomposición espectral
-eigvals, eigvecs = np.linalg.eigh(B)
-
-# Ordenamos de mayor a menor
-idx = np.argsort(eigvals)[::-1]
-eigvals = eigvals[idx]
-eigvecs = eigvecs[:,idx]
-
-# 5. Coordenadas principales (2D)
-k = 2
-L = np.diag(np.sqrt(eigvals[:k]))
-V = eigvecs[:, :k]
-X_coords = V.dot(L)
-
-# 6. Graficamos
-plt.figure(figsize=(6,6))
-plt.scatter(X_coords[:,0], X_coords[:,1], color="steelblue", s=80)
-for i, label in enumerate(labels):
-    plt.text(X_coords[i,0]+0.05, X_coords[i,1]+0.05, label, fontsize=12)
-plt.title("Construcción de Coordenadas Principales (PCoA)")
-plt.xlabel("Coord. Principal 1")
-plt.ylabel("Coord. Principal 2")
-plt.grid(True, linestyle="--", alpha=0.5)
-plt.show()
-
-```
-
-### 7.4.4) Escalado No Métrico (NMDS)
-
-```{python}
-# Escalado No Métrico con sklearn (metric=False)
-nmds = MDS(n_components=2, dissimilarity="precomputed", metric=False, random_state=123, n_init=10, max_iter=1000)
-coords_nmds = nmds.fit_transform(dist_iris)
-
-# DataFrame para graficar
-df_nmds = pd.DataFrame(coords_nmds, columns=["Dim1", "Dim2"])
-df_nmds["Species"] = [labels[i] for i in y]
-
-# Graficamos
-plt.figure(figsize=(8,6))
-sns.scatterplot(data=df_nmds, x="Dim1", y="Dim2", hue="Species", s=60, alpha=0.8)
-plt.title("Escalado No Métrico (NMDS) en iris", fontsize=14)
-plt.xlabel("NMDS 1")
-plt.ylabel("NMDS 2")
-plt.show()
-
-```
-
 # 8) Clusterización
 
 El análisis de clúster o conglomerados es una técnica de estadística multivariante que busca agrupar objetos o individuos en función de su similitud, de modo que los elementos dentro de un mismo grupo sean más parecidos entre sí que con los de otros grupos. A diferencia de métodos supervisados, no requiere variables dependientes predefinidas, sino que trabaja únicamente con medidas de similitud o disimilitud, comúnmente basadas en distancias como la euclidiana $d_{ij} = \sqrt{\sum_{k=1}^p (x_{ik} - x_{jk})^2}$ entre dos observaciones $i$ y $j$ en un espacio de $p$ dimensiones.
@@ -3838,108 +2937,27 @@ plot(modelo, what = "density")
 
 ```
 
-## 8.8) Ejemplo con Python
+## 8.8) Ejemplo en R
 
-**Librerias necesarias**
+```{r fig.height=10, fig.width=12, message=FALSE, warning=FALSE}
+set.seed(123)
+X <- rbind(matrix(rnorm(50 * 2, 0, 0.3), ncol = 2), matrix(rnorm(50 * 2, 2, 0.3), ncol = 2), matrix(rnorm(50 * 2, -2, 0.3), ncol = 2))
+km <- kmeans(X, centers = 3, nstart = 20)
+plot(X, col = km$cluster, pch = 19, main = "Ejemplo grafico de K-medias", xlab = "X1", ylab = "X2"); points(km$centers, pch = 4, col = "red", cex = 2, lwd = 3)
 
+X2 <- rbind(matrix(rnorm(50 * 2, 0, 0.5), ncol = 2), matrix(rnorm(50 * 2, 3, 0.5), ncol = 2), matrix(rnorm(50 * 2, 6, 0.5), ncol = 2))
+pam_fit <- cluster::pam(X2, k = 3)
+plot(X2, col = pam_fit$clustering, pch = 19, main = "Clustering con K-medoides (PAM)", xlab = "X1", ylab = "X2"); points(X2[pam_fit$id.med, ], pch = 18, col = "black", cex = 2)
 
+X3 <- rbind(matrix(rnorm(25 * 2, 0, 1), ncol = 2), matrix(rnorm(25 * 2, 5, 1), ncol = 2))
+hc <- hclust(dist(X3), method = "ward.D2")
+plot(hc, main = "Dendrograma - metodo jerarquico Ward", xlab = "Observaciones", ylab = "Distancia")
+plot(X3, col = cutree(hc, k = 2), pch = 19, main = "Clustering jerarquico en el plano", xlab = "X1", ylab = "X2")
 
-### 8.8.1) K-medias
-
-```{python}
-# Semilla
-np.random.seed(123)
-
-# Datos simulados (3 grupos en 2D)
-X = np.vstack([
-    np.random.normal(loc=0, scale=0.3, size=(50, 2)),
-    np.random.normal(loc=2, scale=0.3, size=(50, 2)),
-    np.random.normal(loc=-2, scale=0.3, size=(50, 2))
-])
-
-# Aplicar K-means
-kmeans = KMeans(n_clusters=3, n_init=20, random_state=123)
-labels_kmeans = kmeans.fit_predict(X)
-
-# Graficar
-plt.scatter(X[:,0], X[:,1], c=labels_kmeans, cmap="viridis", s=50)
-plt.scatter(kmeans.cluster_centers_[:,0], kmeans.cluster_centers_[:,1], 
-            c="red", marker="X", s=200, label="Centroides")
-plt.title("Ejemplo gráfico de K-medias")
-plt.legend()
-plt.show()
-
+X4 <- rbind(MASS::mvrnorm(50, c(0, 0), matrix(c(1, 0.5, 0.5, 1), 2)), MASS::mvrnorm(50, c(5, 0), matrix(c(1, -0.5, -0.5, 1), 2)), MASS::mvrnorm(50, c(3, 5), matrix(c(1, 0.2, 0.2, 1), 2)))
+gmm <- mclust::Mclust(X4, G = 3)
+plot(X4, col = gmm$classification, pch = 19, main = "Clustering basado en modelos gaussianos", xlab = "X1", ylab = "X2")
 ```
-
-### 8.8.2) K-medoides (PAM)
-
-```{python}
-X2 = np.vstack([
-    np.random.normal(loc=0, scale=0.5, size=(50, 2)),
-    np.random.normal(loc=3, scale=0.5, size=(50, 2)),
-    np.random.normal(loc=6, scale=0.5, size=(50, 2))
-])
-
-kmedoids = KMedoids(n_clusters=3, random_state=123, metric="euclidean")
-labels_kmedoids = kmedoids.fit_predict(X2)
-
-plt.scatter(X2[:,0], X2[:,1], c=labels_kmedoids, cmap="plasma", s=50)
-plt.scatter(X2[kmedoids.medoid_indices_,0], X2[kmedoids.medoid_indices_,1], 
-            c="black", marker="D", s=200, label="Medoides")
-plt.title("Clustering con K-medoides (PAM)")
-plt.legend()
-plt.show()
-
-
-```
-
-### 8.8.3) Método jerárquico aglomerativo
-
-```{python}
-X3 = np.vstack([
-    np.random.normal(loc=0, scale=1, size=(25, 2)),
-    np.random.normal(loc=5, scale=1, size=(25, 2))
-])
-
-# Matriz de distancias + clustering
-Z = linkage(X3, method="ward")
-
-# Dendrograma
-plt.figure(figsize=(8,5))
-dendrogram(Z)
-plt.title("Dendrograma - Método Jerárquico (Ward)")
-plt.xlabel("Observaciones")
-plt.ylabel("Distancia")
-plt.show()
-
-# Cortar en 2 clústeres
-labels_hc = fcluster(Z, t=2, criterion="maxclust")
-
-# Visualizar clusters en el plano
-plt.scatter(X3[:,0], X3[:,1], c=labels_hc, cmap="Accent", s=50)
-plt.title("Clustering Jerárquico - Representación en el plano")
-plt.show()
-
-
-```
-
-### 8.8.3) Clúster basado en modelos (GMM)
-
-```{python}
-X4 = np.vstack([
-    np.random.multivariate_normal([0,0], [[1,0.5],[0.5,1]], size=50),
-    np.random.multivariate_normal([5,0], [[1,-0.5],[-0.5,1]], size=50),
-    np.random.multivariate_normal([3,5], [[1,0.2],[0.2,1]], size=50)
-])
-
-gmm = GaussianMixture(n_components=3, random_state=123)
-labels_gmm = gmm.fit_predict(X4)
-
-plt.scatter(X4[:,0], X4[:,1], c=labels_gmm, cmap="Set1", s=50)
-plt.title("Clustering basado en modelos (GMM)")
-plt.show()
-```
-
 # 9) Clasificación
 
 Un modelo de clasificación multivariada es una técnica estadística y de aprendizaje automático que busca asignar observaciones a categorías o clases, cuando dichas observaciones están descritas por múltiples variables independientes (predictoras). Formalmente, se tiene un conjunto de variables explicativas $X = (x_1, x_2, \dots, x_p)$ y una variable respuesta categórica $Y \in {1,2,\dots,K}$, donde $K$ es el número de clases posibles. El objetivo es construir una regla de decisión que minimice el error de clasificación al predecir $Y$ en función de $X$.
@@ -4297,743 +3315,405 @@ ggplot() +
 
 ```
 
-## 9.5) Ejemplo con Python
+## 9.5) Ejemplo en R
 
-### 9.5.1) Clasificación multivariada 
-```{python}
+```{r fig.height=10, fig.width=12, message=FALSE, warning=FALSE}
+set.seed(123)
+n <- 200
+datos <- data.frame(x1 = c(rnorm(n / 2, 2, 1), rnorm(n / 2, 5, 1)), x2 = c(rnorm(n / 2, 2, 1), rnorm(n / 2, 5, 1)), clase = factor(c(rep("A", n / 2), rep("B", n / 2))))
+lda <- MASS::lda(clase ~ x1 + x2, data = datos)
+grid <- expand.grid(x1 = seq(min(datos$x1) - 1, max(datos$x1) + 1, length.out = 200), x2 = seq(min(datos$x2) - 1, max(datos$x2) + 1, length.out = 200))
+grid$clase <- predict(lda, grid)$class
+ggplot(datos, aes(x1, x2, color = clase)) +
+  geom_raster(data = grid, aes(x = x1, y = x2, fill = clase), alpha = 0.25, inherit.aes = FALSE) +
+  geom_point() +
+  labs(title = "Clasificacion multivariada con LDA") +
+  theme_minimal()
 
-# 1. Generar datos simulados
-np.random.seed(123)
-n = 200
-x1 = np.concatenate([np.random.normal(2, 1, n//2), np.random.normal(5, 1, n//2)])
-x2 = np.concatenate([np.random.normal(2, 1, n//2), np.random.normal(5, 1, n//2)])
-clase = np.array(["A"]*(n//2) + ["B"]*(n//2))
+datos_knn <- data.frame(x1 = c(rnorm(160, 2, 1), rnorm(40, 5, 1)), x2 = c(rnorm(160, 2, 1), rnorm(40, 5, 1)), clase = factor(c(rep("A", 160), rep("B", 40))))
+ctrl <- caret::trainControl(method = "cv", number = 10)
+knn_fit <- caret::train(clase ~ x1 + x2, data = datos_knn, method = "knn", trControl = ctrl, tuneGrid = data.frame(k = 1:20))
+knn_fit$bestTune
 
-datos = pd.DataFrame({"x1": x1, "x2": x2, "clase": clase})
+datos_nb <- data.frame(x1 = c(rnorm(n / 2, 2, 1), rnorm(n / 2, 5, 1.2)), x2 = c(rnorm(n / 2, 3, 1), rnorm(n / 2, 6, 1.2)), clase = factor(c(rep("A", n / 2), rep("B", n / 2))))
+nb <- e1071::naiveBayes(clase ~ x1 + x2, data = datos_nb)
+head(predict(nb, datos_nb))
 
-# 2. Entrenar modelo LDA
-lda = LinearDiscriminantAnalysis()
-lda.fit(datos[["x1", "x2"]], datos["clase"])
+x1 <- runif(n, 0, 10); x2 <- runif(n, 0, 10); prob <- plogis(-5 + 0.8 * x1 + 0.6 * x2); y <- rbinom(n, 1, prob)
+datos_logit <- data.frame(x1 = x1, x2 = x2, clase = factor(ifelse(y == 1, "Si", "No")))
+summary(glm(clase ~ x1 + x2, data = datos_logit, family = binomial))
 
-# 3. Crear grilla para frontera
-xx, yy = np.meshgrid(
-    np.linspace(datos.x1.min()-1, datos.x1.max()+1, 200),
-    np.linspace(datos.x2.min()-1, datos.x2.max()+1, 200)
-)
-grid = np.c_[xx.ravel(), yy.ravel()]
-clase_pred = lda.predict(grid)
-
-# 4. Visualización
-plt.contourf(xx, yy, clase_pred.reshape(xx.shape), alpha=0.3, cmap="coolwarm")
-plt.scatter(datos.x1, datos.x2, c=(datos.clase=="A"), cmap="coolwarm", edgecolor="k", s=50)
-plt.title("Clasificación Multivariada con LDA")
-plt.xlabel("Variable X1")
-plt.ylabel("Variable X2")
-plt.show()
-
+datos_iris_lda <- iris[, c("Sepal.Length", "Sepal.Width", "Species")]
+lda_iris <- MASS::lda(Species ~ Sepal.Length + Sepal.Width, data = datos_iris_lda)
+predict(lda_iris, head(datos_iris_lda))$class
 ```
+# 10) Regresión lineal múltiple, inferencia y regularización
 
-### 9.5.2) kNN con clases balanceadas y validación cruzada
+La regresión es una familia de métodos para explicar o predecir una variable respuesta $Y$ a partir de una o más variables predictoras. En su forma lineal múltiple, el modelo para la observación $i$ se escribe como:
 
-```{python}
+$$Y_i = \beta_0 + \beta_1X_{i1} + \beta_2X_{i2} + \dots + \beta_pX_{ip} + \varepsilon_i$$
 
+donde $\beta_0$ es la intersección, $\beta_j$ es el efecto parcial del predictor $X_j$ sobre $Y$ manteniendo los demás predictores constantes, y $\varepsilon_i$ es el error aleatorio. La predicción del modelo es:
 
-# 1. Generar datos desbalanceados
-x1 = np.concatenate([np.random.normal(2, 1, 160), np.random.normal(5, 1, 40)])
-x2 = np.concatenate([np.random.normal(2, 1, 160), np.random.normal(5, 1, 40)])
-clase = np.array(["A"]*160 + ["B"]*40)
+$$\hat{Y}_i = \hat{\beta}_0 + \hat{\beta}_1X_{i1} + \hat{\beta}_2X_{i2} + \dots + \hat{\beta}_pX_{ip}$$
 
-datos = pd.DataFrame({"x1": x1, "x2": x2, "clase": clase})
+El residual mide lo que el modelo no pudo explicar:
 
-# 2. Pipeline con SMOTE (oversampling) + kNN
-pipeline = Pipeline([
-    ("smote", SMOTE(random_state=123)),
-    ("knn", KNeighborsClassifier())
-])
+$$e_i = y_i - \hat{y}_i$$
 
-# 3. Validación cruzada para elegir k óptimo
-param_grid = {"knn__n_neighbors": range(1, 21)}
-grid_search = GridSearchCV(pipeline, param_grid, cv=10, scoring="accuracy")
-grid_search.fit(datos[["x1", "x2"]], datos["clase"])
+En aprendizaje estadístico aplicado conviene separar dos objetivos. Si el objetivo es **explicar**, nos interesan la interpretación de coeficientes, incertidumbre, pruebas de hipótesis y supuestos. Si el objetivo es **predecir**, debemos priorizar error fuera de muestra, validación cruzada y estabilidad del modelo. Un p-valor pequeño puede apoyar que una asociación no parece producto del azar bajo el modelo, pero no prueba causalidad por sí solo.
 
-mejor_k = grid_search.best_params_["knn__n_neighbors"]
-print("Mejor valor de k:", mejor_k)
+## 10.1) Cómo interpretar `summary(lm)`
 
-# 4. Visualización de frontera
-xx, yy = np.meshgrid(
-    np.linspace(datos.x1.min()-1, datos.x1.max()+1, 200),
-    np.linspace(datos.x2.min()-1, datos.x2.max()+1, 200)
-)
-grid = np.c_[xx.ravel(), yy.ravel()]
-clase_pred = grid_search.predict(grid)
+La salida de `summary(lm(...))` condensa estimación, incertidumbre y ajuste del modelo. Las partes más importantes son:
 
-plt.contourf(xx, yy, clase_pred.reshape(xx.shape), alpha=0.3, cmap="coolwarm")
-plt.scatter(datos.x1, datos.x2, c=(datos.clase=="A"), cmap="coolwarm", edgecolor="k", s=50)
-plt.title(f"Clasificación con kNN balanceado (k = {mejor_k})")
-plt.xlabel("Variable X1")
-plt.ylabel("Variable X2")
-plt.show()
+- **Residuals**: resumen de los residuales $e_i$. Si están muy sesgados o tienen extremos grandes, puede haber no linealidad, outliers o varianza no constante.
+- **Estimate**: estimación puntual $\hat{\beta}_j$. En un modelo lineal, indica el cambio promedio esperado en $Y$ por una unidad adicional de $X_j$, manteniendo fijos los demás predictores.
+- **Std. Error**: error estándar de $\hat{\beta}_j$. Mide cuánta variaría la estimación si repitiéramos el muestreo muchas veces.
+- **t value**: razón entre estimación e incertidumbre:
 
-```
+$$t_j = \frac{\hat{\beta}_j}{SE(\hat{\beta}_j)}$$
 
-### 9.5.3) Clasificación Bayesiana (Naive Bayes)
-```{python}
+- **Pr(>|t|)**: p-valor bilateral asociado a $H_0: \beta_j = 0$. Un p-valor bajo indica que, si $H_0$ fuera cierta y los supuestos se cumplieran, sería raro observar un $|t_j|$ tan extremo.
+- **Residual standard error (RSE)**: tamaño típico del error del modelo en las unidades de $Y$:
 
-# 1. Generar datos simulados
-x1 = np.concatenate([np.random.normal(2, 1, n//2), np.random.normal(5, 1.2, n//2)])
-x2 = np.concatenate([np.random.normal(3, 1, n//2), np.random.normal(6, 1.2, n//2)])
-clase = np.array(["A"]*(n//2) + ["B"]*(n//2))
+$$RSE = \sqrt{\frac{\sum_{i=1}^n (y_i - \hat{y}_i)^2}{n - p - 1}}$$
 
-datos = pd.DataFrame({"x1": x1, "x2": x2, "clase": clase})
+- **RMSE**: error cuadrático medio de predicción, usualmente calculado sobre datos de entrenamiento o validación:
 
-# 2. Entrenar modelo Naive Bayes
-nb = GaussianNB()
-nb.fit(datos[["x1", "x2"]], datos["clase"])
+$$RMSE = \sqrt{\frac{1}{n}\sum_{i=1}^n (y_i - \hat{y}_i)^2}$$
 
-# 3. Frontera de decisión
-xx, yy = np.meshgrid(
-    np.linspace(datos.x1.min()-1, datos.x1.max()+1, 200),
-    np.linspace(datos.x2.min()-1, datos.x2.max()+1, 200)
-)
-grid = np.c_[xx.ravel(), yy.ravel()]
-clase_pred = nb.predict(grid)
+- **Multiple R-squared**: proporción de variabilidad de $Y$ explicada por el modelo:
 
-# 4. Visualización
-plt.contourf(xx, yy, clase_pred.reshape(xx.shape), alpha=0.3, cmap="coolwarm")
-plt.scatter(datos.x1, datos.x2, c=(datos.clase=="A"), cmap="coolwarm", edgecolor="k", s=50)
-plt.title("Clasificación Bayesiana (Naive Bayes)")
-plt.xlabel("Variable X1")
-plt.ylabel("Variable X2")
-plt.show()
+$$R^2 = 1 - \frac{\sum_{i=1}^n (y_i - \hat{y}_i)^2}{\sum_{i=1}^n (y_i - \bar{y})^2}$$
 
-```
+- **Adjusted R-squared**: versión penalizada por número de predictores:
 
-### 9.5.4) Regresión Logística
+$$R^2_{adj} = 1 - (1 - R^2)\frac{n - 1}{n - p - 1}$$
 
-```{python}
+- **F-statistic**: prueba global de si el modelo completo explica más que un modelo con solo intercepto:
 
-# 1. Generar datos simulados
-np.random.seed(123)
-x1 = np.random.uniform(0, 10, n)
-x2 = np.random.uniform(0, 10, n)
-prob = 1 / (1 + np.exp(-(-5 + 0.8*x1 + 0.6*x2)))
-y = np.random.binomial(1, prob, n)
-clase = np.where(y == 1, "Sí", "No")
+$$F = \frac{(TSS - RSS)/p}{RSS/(n - p - 1)}$$
 
-datos = pd.DataFrame({"x1": x1, "x2": x2, "clase": clase})
+El p-valor global del estadístico $F$ contrasta:
 
-# 2. Ajustar modelo logístico
-logit = LogisticRegression()
-logit.fit(datos[["x1", "x2"]], datos["clase"])
+$$H_0: \beta_1 = \beta_2 = \dots = \beta_p = 0$$
 
-# 3. Crear grilla y predecir probabilidades
-xx, yy = np.meshgrid(
-    np.linspace(datos.x1.min(), datos.x1.max(), 200),
-    np.linspace(datos.x2.min(), datos.x2.max(), 200)
-)
-grid = np.c_[xx.ravel(), yy.ravel()]
-prob_grid = logit.predict_proba(grid)[:, 1]
-clase_pred = logit.predict(grid)
+Los grados de libertad aparecen porque estimar parámetros consume información. En regresión lineal con $p$ predictores y un intercepto, los grados de libertad residuales son:
 
-# 4. Visualización
-plt.contourf(xx, yy, clase_pred.reshape(xx.shape), alpha=0.3, cmap="coolwarm")
-plt.scatter(datos.x1, datos.x2, c=(datos.clase=="Sí"), cmap="coolwarm", edgecolor="k", s=50)
-plt.title("Clasificación con Regresión Logística")
-plt.xlabel("Variable X1")
-plt.ylabel("Variable X2")
-plt.show()
+$$df_{res} = n - p - 1$$
 
-```
+La desviación estándar y el error estándar no son lo mismo. La desviación estándar describe variabilidad de observaciones individuales; el error estándar describe variabilidad de una estimación. Para una media, por ejemplo:
 
-### 9.5.5) Análisis Discriminante (LDA con iris)
-```{python}
+$$SE(\bar{X}) = \frac{s}{\sqrt{n}}$$
 
-# 1. Dataset iris (2 variables para graficar)
-iris = load_iris(as_frame=True)
-datos = iris.data[["sepal length (cm)", "sepal width (cm)"]]
-clases = iris.target
-
-# 2. Entrenar modelo LDA
-lda = LinearDiscriminantAnalysis()
-lda.fit(datos, clases)
-
-# 3. Crear grilla
-xx, yy = np.meshgrid(
-    np.linspace(datos.iloc[:,0].min()-0.5, datos.iloc[:,0].max()+0.5, 200),
-    np.linspace(datos.iloc[:,1].min()-0.5, datos.iloc[:,1].max()+0.5, 200)
-)
-grid = np.c_[xx.ravel(), yy.ravel()]
-clase_pred = lda.predict(grid)
-
-# 4. Visualización
-plt.contourf(xx, yy, clase_pred.reshape(xx.shape), alpha=0.3, cmap="coolwarm")
-plt.scatter(datos.iloc[:,0], datos.iloc[:,1], c=clases, cmap="coolwarm", edgecolor="k", s=50)
-plt.title("Análisis Discriminante Lineal (LDA) con iris")
-plt.xlabel("Sepal Length")
-plt.ylabel("Sepal Width")
-plt.show()
-
-```
-
-
-
-# 10) Regresión lineal múltiple y regularización
-
-La regresión lineal múltiple es una extensión de la regresión lineal simple que permite modelar la relación entre una variable dependiente $y$ y varias variables independientes $x_1, x_2, \dots, x_p$. La idea es estimar cómo cada predictor influye en $y$, controlando por los demás. Matemáticamente se expresa como:
-
-$$y = \beta_0 + \beta_1 x_1 + \beta_2 x_2 + \dots + \beta_p x_p + \varepsilon$$
-
-donde $\beta_0$ es la intersección, $\beta_j$ son los coeficientes de regresión y $\varepsilon$ es el término de error.
-
-El problema aparece cuando hay multicolinealidad (correlación alta entre predictores) o cuando el número de variables es muy grande en comparación con el número de observaciones. En estos casos, los estimadores $\hat{\beta}$ pueden ser inestables y generar modelos poco interpretables o con sobreajuste. Aquí es donde entra la regularización.
-
-La regularización agrega un término de penalización a la función de pérdida, con el fin de reducir la complejidad del modelo. Dos métodos comunes son Ridge y Lasso. Ridge utiliza la norma cuadrática $L_2$ para penalizar grandes valores de los coeficientes:
-
-$$\text{RSS} + \lambda \sum_{j=1}^{p} \beta_j^2$$
-
-mientras que Lasso utiliza la norma absoluta $L_1$:
-
-$$\text{RSS} + \lambda \sum_{j=1}^{p} |\beta_j|$$
-
-donde $\lambda$ es un hiperparámetro que controla el nivel de penalización.
-
-Estos métodos sirven tanto para mejorar la capacidad predictiva como para seleccionar variables (especialmente Lasso, que puede llevar algunos coeficientes exactamente a cero). Sus aplicaciones incluyen predicción en economía, biología (expresión genética), marketing (análisis de clientes) y cualquier escenario con muchos predictores, donde se busca un modelo más robusto y generalizable.
-
-**Ejemplo con R**
+Esto explica por qué muestras más grandes producen estimaciones más precisas: al cuadruplicar $n$, el error estándar se reduce aproximadamente a la mitad.
 
 ```{r message=FALSE, warning=FALSE}
+modelo_mtcars <- lm(mpg ~ wt + hp, data = mtcars)
 
-set.seed(123)
-
-# 1. Generar datos simulados
-n <- 100
-p <- 10
-X <- matrix(rnorm(n * p), n, p)               # 10 predictores
-beta <- c(3, -2, 0, 0, 1.5, rep(0, p - 5))    # solo 3 predictores relevantes
-y <- X %*% beta + rnorm(n)                    # variable respuesta con ruido
-
-# 2. Ajustar modelos con glmnet
-# alpha = 0 -> Ridge, alpha = 1 -> Lasso
-ridge_fit <- glmnet(X, y, alpha = 0)  
-lasso_fit <- glmnet(X, y, alpha = 1)
-
-# 3. Visualización: trayectoria de coeficientes
-par(mfrow = c(1, 2))   # Dos gráficos lado a lado
-
-plot(ridge_fit, xvar = "lambda", main = "Trayectoria Ridge (L2)")
-plot(lasso_fit, xvar = "lambda", main = "Trayectoria Lasso (L1)")
-
+summary(modelo_mtcars)
+broom::tidy(modelo_mtcars, conf.int = TRUE)
+broom::glance(modelo_mtcars)
+confint(modelo_mtcars)
+anova(modelo_mtcars)
+car::vif(modelo_mtcars)
 ```
 
+En el modelo `mpg ~ wt + hp`, el coeficiente de `wt` estima cómo cambia el rendimiento en millas por galón al aumentar el peso del vehículo en 1000 libras, manteniendo constante la potencia `hp`. Si `Estimate` es negativo, el modelo sugiere que vehículos más pesados tienden a consumir más combustible. El `Std. Error` indica la precisión de esa pendiente. El `t value` compara el tamaño del efecto contra su error estándar, y `Pr(>|t|)` resume qué tan incompatible es ese resultado con una pendiente poblacional igual a cero.
 
-## 10.1) Regresión lineal simple
+Los intervalos de confianza para coeficientes se interpretan como rangos plausibles para $\beta_j$ bajo el modelo. Para un nivel aproximado del $95\%$:
 
-La regresión lineal simple es un modelo estadístico que busca describir la relación entre dos variables: una independiente o explicativa ($X$) y una dependiente o de respuesta ($Y$). Su objetivo es estimar cómo cambia $Y$ en función de los valores de $X$. Matemáticamente, se expresa como:
+$$\hat{\beta}_j \pm t_{0.975, df}SE(\hat{\beta}_j)$$
 
-$$Y = \beta_0 + \beta_1 X + \varepsilon$$
+Un intervalo de confianza para la media esperada de $Y$ en un punto $x_0$ cuantifica incertidumbre sobre $E(Y|X=x_0)$. Un intervalo de predicción es más ancho porque además incluye la variabilidad de una observación futura individual:
 
-donde $\beta_0$ es la intersección (ordenada al origen), $\beta_1$ es la pendiente que mide el efecto de $X$ sobre $Y$, y $\varepsilon$ es el término de error aleatorio.
+$$\hat{y}_0 \pm t_{\alpha/2, df}\sqrt{\widehat{Var}(\hat{y}_0) + \hat{\sigma}^2}$$
 
-Este modelo sirve principalmente para explicar y predecir. Explica al identificar si existe una relación significativa entre dos variables, y predice al permitir estimar el valor esperado de $Y$ para un determinado valor de $X$. Por ejemplo, si $X$ es la cantidad de horas de estudio y $Y$ es la calificación en un examen, la regresión lineal simple puede mostrar qué tanto influyen las horas de estudio en los resultados.
+```{r message=FALSE, warning=FALSE}
+nuevo_auto <- data.frame(wt = 3.2, hp = 120)
 
-Entre los casos de uso más comunes están: economía (relación entre ingreso y consumo), salud (efecto de una dosis de medicamento sobre una respuesta clínica), educación (impacto de la asistencia a clases en el rendimiento), e ingeniería (relación entre la temperatura y la resistencia de un material). En todos estos casos, lo importante es que haya una relación que se pueda aproximar de manera lineal.
+predict(modelo_mtcars, newdata = nuevo_auto, interval = "confidence")
+predict(modelo_mtcars, newdata = nuevo_auto, interval = "prediction")
+```
 
-En la práctica, la regresión lineal simple se estima mediante el método de mínimos cuadrados ordinarios (MCO), que consiste en encontrar los valores de $\hat{\beta}_0$ y $\hat{\beta}_1$ que minimicen la suma de los errores cuadráticos:
+## 10.2) Regresión lineal simple
 
-$$\min \sum_{i=1}^n (y_i - \hat{y}_i)^2 \;=\; \min \sum_{i=1}^n \left(y_i - (\hat{\beta}_0 + \hat{\beta}_1 x_i)\right)^2$$
-Este procedimiento garantiza la mejor recta de ajuste posible bajo los supuestos del modelo (linealidad, independencia, homocedasticidad y normalidad de errores).
+La regresión lineal simple modela una respuesta $Y$ con un solo predictor $X$:
 
-**Ejemplo con R**
-```{r}
+$$Y_i = \beta_0 + \beta_1X_i + \varepsilon_i$$
 
+El método de mínimos cuadrados ordinarios estima $\hat{\beta}_0$ y $\hat{\beta}_1$ minimizando la suma de residuos cuadrados:
 
-# Simulación de datos: Horas de estudio (X) y Nota de examen (Y)
+$$\min_{\beta_0,\beta_1}\sum_{i=1}^n \left(y_i - \beta_0 - \beta_1x_i\right)^2$$
+
+La pendiente $\hat{\beta}_1$ se interpreta en unidades de $Y$ por unidad de $X$. Si $X$ son horas de estudio y $Y$ es nota, una pendiente de $5$ significa que una hora adicional se asocia con $5$ puntos más en promedio, bajo el modelo.
+
+```{r message=FALSE, warning=FALSE}
 set.seed(123)
-horas <- runif(50, 0, 10)  # 50 observaciones entre 0 y 10 horas
-nota <- 40 + 5 * horas + rnorm(50, 0, 5)  # Relación lineal con algo de ruido
-datos <- data.frame(horas, nota)
+datos_estudio <- data.frame(
+  horas = runif(50, 0, 10)
+)
+datos_estudio$nota <- 40 + 5 * datos_estudio$horas + rnorm(50, 0, 5)
 
-# Ajuste del modelo de regresión lineal simple
-modelo <- lm(nota ~ horas, data = datos)
+modelo_simple <- lm(nota ~ horas, data = datos_estudio)
 
-# Resumen "limpio" del modelo
-tidy(modelo)
+summary(modelo_simple)
+broom::tidy(modelo_simple, conf.int = TRUE)
+broom::glance(modelo_simple)
 
-# Gráfico con recta de regresión
-p <- ggplot(datos, aes(x = horas, y = nota)) +
-  geom_point(color = "steelblue", size = 3, alpha = 0.7) +   # puntos
-  geom_smooth(method = "lm", se = TRUE, color = "red", size = 1) + # recta
-  stat_regline_equation(                                   # ecuación en gráfico
+ggplot(datos_estudio, aes(x = horas, y = nota)) +
+  geom_point(color = "steelblue", size = 3, alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE, color = "red", linewidth = 1) +
+  stat_regline_equation(
     aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")),
     formula = y ~ x
   ) +
   labs(
-    title = "Ejemplo de Regresión Lineal Simple",
+    title = "Regresion lineal simple: nota segun horas de estudio",
     x = "Horas de estudio",
-    y = "Nota en el examen"
+    y = "Nota"
   ) +
   theme_minimal(base_size = 14)
-
-print(p)
-
 ```
 
-## 10.2) Regresión lineal múltiple
+## 10.3) Regresión lineal múltiple e interpretación
 
-La regresión lineal múltiple es una extensión de la regresión lineal simple que permite analizar la relación entre una variable dependiente $Y$ y varias variables independientes $X_1, X_2, \dots, X_p$. Su forma general es:
+La regresión múltiple permite controlar por varios predictores simultáneamente:
 
-$$Y = \beta_0 + \beta_1 X_1 + \beta_2 X_2 + \dots + \beta_p X_p + \varepsilon
-$$
+$$Y_i = \beta_0 + \beta_1X_{i1} + \beta_2X_{i2} + \dots + \beta_pX_{ip} + \varepsilon_i$$
 
-donde $\beta_0$ es la constante, $\beta_j$ los coeficientes que representan el efecto parcial de cada $X_j$ sobre $Y$, y $\varepsilon$ el error aleatorio.
+Cada $\beta_j$ es un efecto parcial: compara observaciones que tienen el mismo valor en los demás predictores. Por eso una variable puede cambiar de signo cuando se agregan controles. Si los predictores están correlacionados, los coeficientes pueden volverse difíciles de interpretar y sus errores estándar pueden inflarse.
 
-Este modelo sirve para explicar, cuantificar y predecir fenómenos más complejos que no dependen de una sola variable. Cada coeficiente $\beta_j$ indica cuánto cambia en promedio $Y$ al variar $X_j$ en una unidad, manteniendo constantes las demás variables. De esta forma, se pueden identificar los factores más influyentes y cómo interactúan entre sí.
+La multicolinealidad aparece cuando uno o varios predictores son combinaciones lineales exactas o casi exactas de otros. Una forma práctica de inspeccionarla es el factor de inflación de varianza:
 
-Los casos de uso son amplios: en economía, predecir el consumo a partir de ingreso, tasa de interés y desempleo; en salud, explicar la presión arterial según edad, peso y nivel de actividad física; en marketing, estimar las ventas a partir de inversión en publicidad, precio y competencia; en ingeniería, modelar la resistencia de un material en función de temperatura, humedad y presión.
+$$VIF_j = \frac{1}{1 - R_j^2}$$
 
-El modelo se estima generalmente con mínimos cuadrados ordinarios (MCO), minimizando la suma de los errores al cuadrado:
-
-$$\min \sum_{i=1}^n \left( y_i - \left( \beta_0 + \beta_1 x_{i1} + \beta_2 x_{i2} + \dots + \beta_p x_{ip} \right) \right)^2
-$$
-Bajo supuestos como linealidad, independencia, homocedasticidad y normalidad de los errores, el estimador obtenido es insesgado y eficiente, lo que hace de la regresión múltiple una herramienta fundamental en estadística aplicada.
-
-
-**Ejemplo con R**
+donde $R_j^2$ se obtiene al explicar $X_j$ con los demás predictores. Valores altos indican que el coeficiente de $X_j$ puede ser inestable.
 
 ```{r message=FALSE, warning=FALSE}
+modelo_multiple <- lm(mpg ~ wt + hp + qsec + factor(am), data = mtcars)
 
+summary(modelo_multiple)
+broom::tidy(modelo_multiple, conf.int = TRUE)
+broom::glance(modelo_multiple)
+car::vif(modelo_multiple)
 
-# Dataset
-data(mtcars)
-
-# Ajuste del modelo: mpg explicado por peso (wt) y potencia (hp)
-modelo <- lm(mpg ~ wt + hp, data = mtcars)
-
-# Resumen "limpio" del modelo
-tidy(modelo)
-
-# Diagnóstico de multicolinealidad
-vif(modelo)
-
-# Gráfico: dispersión 3D proyectada (mpg ~ wt + hp)
 ggplot(mtcars, aes(x = wt, y = mpg, color = hp)) +
   geom_point(size = 3, alpha = 0.8) +
   geom_smooth(method = "lm", se = FALSE, aes(group = 1), color = "red") +
-  scale_color_gradient(low = "skyblue", high = "darkblue") +
+  scale_color_viridis_c() +
   labs(
-    title = "Regresión Lineal Múltiple: mpg ~ wt + hp",
-    x = "Peso del vehículo (1000 lbs)",
-    y = "Millas por galón (mpg)",
-    color = "Potencia (hp)"
+    title = "Regresion multiple: mpg explicado por peso, potencia y transmision",
+    x = "Peso del vehiculo (1000 lbs)",
+    y = "Millas por galon",
+    color = "Potencia"
   ) +
   theme_minimal(base_size = 14)
-
-# Pares de relaciones entre variables (útil para explorar el modelo)
-ggpairs(mtcars[, c("mpg", "wt", "hp")])
-
 ```
 
+Las variables categóricas deben representarse numéricamente. En R, `factor(am)` crea una codificación con una categoría de referencia. Si `am = 0` es la referencia, el coeficiente de `factor(am)1` estima la diferencia promedio de `mpg` entre autos manuales y automáticos, manteniendo fijos los demás predictores.
 
-**Mejor forma de elegir los predictores que aportan mas a el modelo**
+Las interacciones se usan cuando el efecto de un predictor depende de otro. Por ejemplo, `wt * hp` incluye `wt`, `hp` y `wt:hp`:
 
-La mejor forma de elegir predictores que más aportan a un modelo se conoce como selección de variables o selección de características. El objetivo es identificar qué subconjunto de variables explicativas $X_1, X_2, \dots, X_p$ tiene mayor poder explicativo sobre la variable respuesta $Y$. Esto ayuda a mejorar la interpretabilidad, reducir la complejidad del modelo y, en muchos casos, aumentar su capacidad de generalización.
+$$Y_i = \beta_0 + \beta_1wt_i + \beta_2hp_i + \beta_3(wt_i \times hp_i) + \varepsilon_i$$
 
-Existen varias estrategias: la selección hacia adelante (añadiendo variables una a una), la selección hacia atrás (eliminando predictores irrelevantes), y la selección exhaustiva, que evalúa todos los subconjuntos posibles de predictores. Los criterios más usados para elegir el mejor subconjunto son medidas como $R^2$, $R^2$ ajustado, $C_p$ de Mallows, AIC y BIC.
+Si $\beta_3$ es distinto de cero, la pendiente de `wt` no es constante; cambia según el nivel de `hp`.
 
-Formalmente, se busca encontrar el subconjunto de variables $S \subseteq {1,\dots,p}$ que minimiza una medida de error de ajuste:
-$$S^{*} = \arg\min_{S} \; \text{AIC}(S)$$ y $$S^{*} = \arg\min_{S} \; \text{BIC}(S)$$
+```{r message=FALSE, warning=FALSE}
+modelo_interaccion <- lm(mpg ~ wt * hp, data = mtcars)
 
-donde $\text{AIC}$ y $\text{BIC}$ son criterios de información que equilibran el ajuste y la complejidad del modelo.
+broom::tidy(modelo_interaccion, conf.int = TRUE)
+anova(modelo_mtcars, modelo_interaccion)
+```
 
-Los casos de uso son amplios: en economía, seleccionar indicadores clave para un modelo de crecimiento; en salud, identificar factores de riesgo más relevantes para una enfermedad; en marketing, escoger las variables de campañas que más explican las ventas; y en machine learning, reducir la dimensionalidad de datos para evitar sobreajuste.
+## 10.4) Diagnóstico de regresión
 
-**Ejemplo con R**
-```{r}
+Un modelo con buen $R^2$ puede seguir siendo problemático. Los diagnósticos miran si los errores tienen patrones, si hay outliers, si algunos puntos tienen demasiada influencia y si la varianza residual cambia con los valores ajustados.
 
+Los residuales estandarizados dividen cada residual por una estimación de su desviación típica:
 
-# Dataset: mtcars, predecir mpg a partir de varias variables
-data(mtcars)
+$$r_i = \frac{e_i}{\widehat{SE}(e_i)}$$
 
-# Selección de subconjuntos con leaps
-ajuste <- regsubsets(mpg ~ wt + hp + disp + cyl + drat + qsec, 
-                     data = mtcars, 
-                     nbest = 1,   # mejor subconjunto por tamaño
-                     nvmax = 6)   # máximo número de variables
+Valores con $|r_i| > 2$ o $|r_i| > 3$ merecen revisión. La distancia de Cook combina tamaño del residual y leverage para medir influencia:
 
-# Resumen de resultados
-res <- summary(ajuste)
+$$D_i = \frac{e_i^2}{(p+1)MSE}\frac{h_{ii}}{(1-h_{ii})^2}$$
 
-# Visualización del R^2 ajustado
-df_plot <- data.frame(
-  Num_Variables = 1:length(res$adjr2),
-  Adj_R2 = res$adjr2
+donde $h_{ii}$ es el leverage de la observación $i$. Un punto influyente puede cambiar de forma importante los coeficientes si se elimina.
+
+```{r message=FALSE, warning=FALSE}
+diagnostico <- broom::augment(modelo_multiple) %>%
+  dplyr::mutate(
+    observacion = row_number(),
+    resid_est = rstandard(modelo_multiple),
+    leverage = hatvalues(modelo_multiple),
+    cooks = cooks.distance(modelo_multiple)
+  )
+
+head(diagnostico)
+
+ggplot(diagnostico, aes(x = .fitted, y = .resid)) +
+  geom_hline(yintercept = 0, linetype = 2, color = "gray40") +
+  geom_point(color = "steelblue", size = 3) +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(
+    title = "Residuales vs valores ajustados",
+    x = "Valores ajustados",
+    y = "Residuales"
+  ) +
+  theme_minimal()
+
+ggplot(diagnostico, aes(sample = .std.resid)) +
+  stat_qq(color = "steelblue") +
+  stat_qq_line(color = "red") +
+  labs(title = "QQ plot de residuales estandarizados") +
+  theme_minimal()
+
+ggplot(diagnostico, aes(x = observacion, y = cooks)) +
+  geom_col(fill = "tomato") +
+  geom_hline(yintercept = 4 / nrow(diagnostico), linetype = 2) +
+  labs(
+    title = "Distancia de Cook por observacion",
+    x = "Observacion",
+    y = "Cook's distance"
+  ) +
+  theme_minimal()
+
+diagnostico %>%
+  dplyr::arrange(desc(cooks)) %>%
+  dplyr::select(observacion, .fitted, .resid, resid_est, leverage, cooks) %>%
+  head(6)
+```
+
+Si el gráfico de residuales vs ajustados muestra forma curva, puede faltar una transformación o un término no lineal. Si la dispersión crece o decrece con `.fitted`, puede haber heterocedasticidad. Si el QQ plot se aparta mucho de la línea, los errores pueden no ser normales; esto afecta sobre todo inferencia e intervalos en muestras pequeñas. Si hay Cook's distance grande, conviene investigar esos registros antes de concluir.
+
+## 10.5) Validación cruzada y error fuera de muestra
+
+Las métricas de `summary(lm)` se calculan sobre los mismos datos usados para entrenar. Para predicción, eso puede ser optimista. La validación cruzada estima desempeño fuera de muestra dividiendo los datos en $k$ partes o folds. Para cada fold se entrena con $k-1$ partes y se predice la parte retenida.
+
+El error fuera de muestra se resume con RMSE:
+
+$$RMSE_{CV} = \sqrt{\frac{1}{n}\sum_{i=1}^n (y_i - \hat{y}_{i,-fold(i)})^2}$$
+
+```{r message=FALSE, warning=FALSE}
+set.seed(123)
+k <- 5
+folds <- sample(rep(1:k, length.out = nrow(mtcars)))
+pred_cv <- rep(NA_real_, nrow(mtcars))
+
+for (fold in 1:k) {
+  entrenamiento <- mtcars[folds != fold, ]
+  validacion <- mtcars[folds == fold, ]
+  ajuste_cv <- lm(mpg ~ wt + hp + qsec + factor(am), data = entrenamiento)
+  pred_cv[folds == fold] <- predict(ajuste_cv, newdata = validacion)
+}
+
+rmse_cv <- sqrt(mean((mtcars$mpg - pred_cv)^2))
+rmse_entrenamiento <- sqrt(mean(residuals(modelo_multiple)^2))
+
+data.frame(
+  metrica = c("RMSE entrenamiento", "RMSE validacion cruzada"),
+  valor = c(rmse_entrenamiento, rmse_cv)
+)
+```
+
+Si el RMSE de validación cruzada es mucho mayor que el RMSE de entrenamiento, el modelo probablemente está sobreajustando o depende demasiado de observaciones particulares. En ese caso conviene simplificar variables, revisar outliers, usar regularización o recolectar más datos.
+
+## 10.6) Selección de variables
+
+La selección de variables busca un modelo más parsimonioso: suficiente para explicar o predecir, pero no tan complejo que capture ruido. Criterios como AIC y BIC equilibran ajuste y complejidad:
+
+$$AIC = -2\log(L) + 2k$$
+
+$$BIC = -2\log(L) + k\log(n)$$
+
+donde $L$ es la verosimilitud maximizada, $k$ el número de parámetros y $n$ el tamaño muestral. En regresión lineal también es común comparar $R^2_{adj}$.
+
+```{r message=FALSE, warning=FALSE}
+ajuste_subconjuntos <- leaps::regsubsets(
+  mpg ~ wt + hp + disp + cyl + drat + qsec,
+  data = mtcars,
+  nbest = 1,
+  nvmax = 6
 )
 
-ggplot(df_plot, aes(x = Num_Variables, y = Adj_R2)) +
-  geom_line(color = "steelblue", size = 1.2) +
+res_subconjuntos <- summary(ajuste_subconjuntos)
+
+df_subconjuntos <- data.frame(
+  num_variables = seq_along(res_subconjuntos$adjr2),
+  r2_ajustado = res_subconjuntos$adjr2,
+  bic = res_subconjuntos$bic,
+  cp = res_subconjuntos$cp
+)
+
+df_subconjuntos
+
+ggplot(df_subconjuntos, aes(x = num_variables, y = r2_ajustado)) +
+  geom_line(color = "steelblue", linewidth = 1) +
   geom_point(color = "red", size = 3) +
   labs(
-    title = "Selección de variables con leaps",
-    x = "Número de variables en el modelo",
-    y = "R² Ajustado"
+    title = "Seleccion de variables por R2 ajustado",
+    x = "Numero de variables",
+    y = "R2 ajustado"
   ) +
-  theme_minimal(base_size = 14)
-
+  theme_minimal()
 ```
 
+La selección automática ayuda, pero no reemplaza criterio sustantivo. Un predictor puede tener p-valor bajo y ser inútil para predicción, o tener p-valor alto por colinealidad aunque aporte información junto con otros predictores. En problemas predictivos, el árbitro final debe ser el error fuera de muestra.
 
-## 10.3) Regularización
+## 10.7) Regularización Ridge, Lasso y Elastic Net
 
-La regularización es una técnica utilizada en modelos estadísticos y de machine learning, especialmente en la regresión lineal múltiple, para evitar el sobreajuste (overfitting). El sobreajuste ocurre cuando un modelo se adapta demasiado a los datos de entrenamiento, perdiendo capacidad de generalización. La idea central de la regularización es añadir un término de penalización a la función de error, de modo que los coeficientes $\beta_j$ no crezcan demasiado.
+La regularización agrega una penalización a la función de pérdida para controlar coeficientes grandes, reducir varianza y mejorar generalización. En forma general:
 
-Existen dos métodos clásicos: Ridge (L2) y Lasso (L1). En Ridge, la penalización es proporcional a la suma de los cuadrados de los coeficientes:
+$$RSS = \sum_{i=1}^n (y_i - \hat{y}_i)^2$$
 
-$$\min \sum_{i=1}^n \left(y_i - \hat{y}_i\right)^2 + \lambda \sum_{j=1}^p \beta_j^2$$
+Ridge usa penalización $L_2$:
 
-En Lasso, la penalización es proporcional a la suma del valor absoluto de los coeficientes:
+$$\min_{\beta}\left\{ \sum_{i=1}^n (y_i - \hat{y}_i)^2 + \lambda\sum_{j=1}^p \beta_j^2 \right\}$$
 
-$$\min \sum_{i=1}^n \left(y_i - \hat{y}_i\right)^2 + \lambda \sum_{j=1}^p \left|\beta_j\right|
-$$
-donde $\lambda \geq 0$ es un hiperparámetro que controla la fuerza de la penalización.
+Ridge reduce coeficientes hacia cero, pero rara vez los vuelve exactamente cero. Es útil con predictores correlacionados porque estabiliza la solución.
 
-La regularización sirve para mejorar la estabilidad del modelo y seleccionar variables relevantes. En Ridge, los coeficientes se reducen pero nunca son exactamente cero; en Lasso, algunos coeficientes pueden volverse exactamente cero, funcionando además como método de selección de variables.
+Lasso usa penalización $L_1$:
 
-Los casos de uso incluyen modelos con muchas variables (p.ej., en genómica, texto, marketing digital), problemas de multicolinealidad donde varias $X_j$ están correlacionadas, y situaciones donde interesa reducir la complejidad del modelo sin perder capacidad predictiva. En práctica, la regularización ayuda a construir modelos más robustos y con mejor desempeño en datos nuevos.
+$$\min_{\beta}\left\{ \sum_{i=1}^n (y_i - \hat{y}_i)^2 + \lambda\sum_{j=1}^p |\beta_j| \right\}$$
 
+Lasso puede dejar coeficientes exactamente en cero, así que también funciona como selección automática de variables.
 
-**Ejemplo con R**
+Elastic Net combina ambas:
 
-```{r}
+$$\min_{\beta}\left\{ \sum_{i=1}^n (y_i - \hat{y}_i)^2 + \lambda\left[\alpha\sum_{j=1}^p |\beta_j| + (1-\alpha)\sum_{j=1}^p \beta_j^2\right]\right\}$$
 
+donde $\lambda \geq 0$ controla la fuerza total de regularización y $0 \leq \alpha \leq 1$ controla la mezcla. Si $\alpha = 1$, el modelo es Lasso; si $\alpha = 0$, es Ridge.
 
-# Dataset: mtcars, variables predictoras (wt, hp, disp, cyl) para predecir mpg
-x <- as.matrix(mtcars[, c("wt", "hp", "disp", "cyl")])
-y <- mtcars$mpg
+```{r message=FALSE, warning=FALSE}
+set.seed(123)
+x_reg <- as.matrix(mtcars[, c("wt", "hp", "disp", "cyl")])
+y_reg <- mtcars$mpg
 
-# Ajuste con Lasso (alpha = 1)
-modelo_lasso <- glmnet(x, y, alpha = 1)
+modelo_ridge <- glmnet::glmnet(x_reg, y_reg, alpha = 0)
+modelo_lasso <- glmnet::glmnet(x_reg, y_reg, alpha = 1)
+modelo_en <- glmnet::glmnet(x_reg, y_reg, alpha = 0.5)
 
-# Ajuste con Ridge (alpha = 0)
-modelo_ridge <- glmnet(x, y, alpha = 0)
+cv_ridge <- glmnet::cv.glmnet(x_reg, y_reg, alpha = 0)
+cv_lasso <- glmnet::cv.glmnet(x_reg, y_reg, alpha = 1)
+cv_en <- glmnet::cv.glmnet(x_reg, y_reg, alpha = 0.5)
 
-# Visualización de trayectorias de coeficientes (path plot)
-par(mfrow = c(1,2))
-plot(modelo_lasso, xvar = "lambda", label = TRUE, main = "Lasso (L1)")
-plot(modelo_ridge, xvar = "lambda", label = TRUE, main = "Ridge (L2)")
+data.frame(
+  modelo = c("Ridge", "Lasso", "Elastic Net"),
+  alpha = c(0, 1, 0.5),
+  lambda_min = c(cv_ridge$lambda.min, cv_lasso$lambda.min, cv_en$lambda.min),
+  lambda_1se = c(cv_ridge$lambda.1se, cv_lasso$lambda.1se, cv_en$lambda.1se)
+)
 
+coef(cv_ridge, s = "lambda.min")
+coef(cv_lasso, s = "lambda.min")
+coef(cv_en, s = "lambda.min")
+
+par(mfrow = c(1, 3))
+plot(modelo_ridge, xvar = "lambda", main = "Ridge")
+plot(modelo_lasso, xvar = "lambda", main = "Lasso")
+plot(modelo_en, xvar = "lambda", main = "Elastic Net")
+par(mfrow = c(1, 1))
 ```
 
-
-
-## 10.4) Regularización Ridge
-
-La regularización Ridge, también llamada regresión de cresta, es una técnica de regresión lineal regularizada que busca mejorar la estabilidad y capacidad de predicción del modelo cuando existen muchas variables o problemas de multicolinealidad. A diferencia de la regresión lineal tradicional, Ridge añade un término de penalización cuadrático a la función de error, lo que impide que los coeficientes $\beta_j$ crezcan demasiado.
-
-Formalmente, el problema de Ridge se plantea como:
-
-$$\min \sum_{i=1}^n \left( y_i - \hat{y}_i \right)^2 + \lambda \sum_{j=1}^p \left| \beta_j \right|
-$$
-donde $\lambda \geq 0$ es el hiperparámetro de regularización. A mayor $\lambda$, más fuerte es la penalización, y más se reducen los coeficientes hacia cero, aunque nunca llegan a ser exactamente cero.
-
-Ridge sirve para mejorar la generalización del modelo, reduciendo la varianza de los estimadores a costa de introducir un pequeño sesgo. Es útil en contextos donde hay muchas variables predictoras y correlaciones altas entre ellas, ya que controla la inestabilidad de los coeficientes.
-
-Los casos de uso son comunes en problemas de predicción con alta dimensionalidad: análisis de datos genómicos, series de tiempo con múltiples predictores, modelos de riesgo en finanzas y aplicaciones de machine learning donde se requiere un modelo robusto sin sobreajuste.
-
-**Ejemplo con R**
-```{r}
-
-
-# Dataset: mtcars, variables predictoras para predecir mpg
-x <- as.matrix(mtcars[, c("wt", "hp", "disp", "cyl")])
-y <- mtcars$mpg
-
-# Ajuste con Ridge (alpha = 0)
-modelo_ridge <- glmnet(x, y, alpha = 0)
-
-# Validación cruzada para elegir el mejor lambda
-cv_ridge <- cv.glmnet(x, y, alpha = 0)
-
-# Mejor valor de lambda
-cv_ridge$lambda.min
-
-# Gráfico de trayectorias de coeficientes
-plot(modelo_ridge, xvar = "lambda", label = TRUE, main = "Trayectoria de coeficientes (Ridge)")
-
-# Gráfico de validación cruzada
-plot(cv_ridge)
-
-```
-
-
-## 10.5) Regularización Lazo
-
-La regularización Lasso (Least Absolute Shrinkage and Selection Operator) es una variante de la regresión lineal regularizada que, además de controlar el sobreajuste, permite realizar selección automática de variables. Al igual que Ridge, añade un término de penalización a la función de error, pero en este caso se utiliza la norma $L1$ en lugar de la $L2$.
-
-Formalmente, el problema de Lasso se define como:
-$$\min \sum_{i=1}^n \left( y_i - \hat{y}_i \right)^2
-$$
-
-donde $\lambda \geq 0$ controla la intensidad de la penalización. A medida que $\lambda$ crece, algunos coeficientes $\beta_j$ se reducen exactamente a cero, lo que significa que esas variables quedan excluidas del modelo.
-
-Lasso sirve no solo para evitar sobreajuste, sino también para simplificar modelos complejos, ya que selecciona automáticamente las variables más relevantes. Esto lo hace especialmente útil en contextos donde el número de predictores $p$ es grande y se sospecha que solo un subconjunto de ellos tiene un impacto real en la variable respuesta.
-
-Los casos de uso incluyen áreas como la bioinformática (selección de genes asociados a una enfermedad), el marketing (detectar qué variables explican mejor las ventas), la economía (selección de indicadores clave en modelos macroeconómicos) y el machine learning en general cuando se busca un modelo parsimonioso y robusto.
-
-**Ejemplo con R**
-```{r}
-
-
-# Dataset: mtcars, variables predictoras para predecir mpg
-x <- as.matrix(mtcars[, c("wt", "hp", "disp", "cyl")])
-y <- mtcars$mpg
-
-# Ajuste con Lasso (alpha = 1)
-modelo_lasso <- glmnet(x, y, alpha = 1)
-
-# Validación cruzada para elegir el mejor lambda
-cv_lasso <- cv.glmnet(x, y, alpha = 1)
-
-# Mejor valor de lambda
-cv_lasso$lambda.min
-
-# Gráfico de trayectorias de coeficientes
-plot(modelo_lasso, xvar = "lambda", label = TRUE, main = "Trayectoria de coeficientes (Lasso)")
-
-# Gráfico de validación cruzada
-plot(cv_lasso)
-
-```
-
-
-## 10.6) Elastic Net
-
-El Elastic Net es una técnica de regularización que combina lo mejor de Ridge (L2) y Lasso (L1). Su objetivo es controlar el sobreajuste y mejorar la capacidad predictiva de los modelos de regresión cuando hay muchas variables o fuerte correlación entre ellas. La función de costo incluye ambos términos de penalización:
-
-$$\min \sum_{i=1}^n \left( y_i - \hat{y}_i \right)^2 
-+ \lambda \left( \alpha \sum_{j=1}^p \left| \beta_j \right| 
-+ (1-\alpha) \sum_{j=1}^p \beta_j^2 \right)$$
-
-donde $\lambda \geq 0$ regula la fuerza de la penalización y $0 \leq \alpha \leq 1$ controla la mezcla entre Lasso y Ridge.
-
-Sirve para evitar el sobreajuste, manejar multicolinealidad y a la vez realizar una selección parcial de variables. Cuando $\alpha = 1$, Elastic Net se comporta como Lasso; cuando $\alpha = 0$, se comporta como Ridge; y para valores intermedios combina sus efectos.
-
-Los casos de uso más comunes incluyen problemas con datos de alta dimensión ($p \gg n$), como en bioinformática (selección de genes), análisis de texto (miles de variables de palabras), predicción financiera con muchos indicadores correlacionados, y modelos de marketing digital donde hay que filtrar predictores relevantes de grandes bases de datos.
-
-En la práctica, Elastic Net es especialmente útil cuando hay grupos de variables altamente correlacionadas: Lasso tendería a escoger solo una de ellas, mientras que Elastic Net puede retener el grupo completo, logrando un modelo más estable y robusto.
-
-**Ejemplo grafico con R**
-```{r}
-
-
-# Dataset: mtcars, variables predictoras para predecir mpg
-x <- as.matrix(mtcars[, c("wt", "hp", "disp", "cyl")])
-y <- mtcars$mpg
-
-# Ajuste con Elastic Net (alpha = 0.5 mezcla de Lasso y Ridge)
-modelo_en <- glmnet(x, y, alpha = 0.5)
-
-# Validación cruzada para elegir el mejor lambda
-cv_en <- cv.glmnet(x, y, alpha = 0.5)
-
-# Mejor valor de lambda
-cv_en$lambda.min
-
-# Gráfico de trayectorias de coeficientes
-plot(modelo_en, xvar = "lambda", label = TRUE, main = "Trayectoria de coeficientes (Elastic Net)")
-
-# Gráfico de validación cruzada
-plot(cv_en)
-
-```
-
-
-
-## 10.7) Ejemplo con Python
-
-
-### 10.7.1) Regresión lineal simple
-```{python}
-# Simulación de datos: Horas de estudio (X) y Nota de examen (Y)
-np.random.seed(123)
-horas = np.random.uniform(0, 10, 50)
-nota = 40 + 5 * horas + np.random.normal(0, 5, 50)
-
-# DataFrame
-datos = pd.DataFrame({"horas": horas, "nota": nota})
-
-# Ajuste con scikit-learn
-X = datos[["horas"]]
-y = datos["nota"]
-
-modelo = LinearRegression()
-modelo.fit(X, y)
-
-print("Intercepto:", modelo.intercept_)
-print("Coeficiente:", modelo.coef_[0])
-print("R²:", modelo.score(X, y))
-
-# Visualización
-sns.lmplot(x="horas", y="nota", data=datos, ci=95, line_kws={"color": "red"})
-plt.title("Ejemplo de Regresión Lineal Simple", fontsize=14)
-plt.show()
-
-```
-
-
-### 10.7.2) Regresión lineal múltiple
-
-```{python}
-# Dataset mtcars en Python (se carga desde seaborn)
-mtcars = sns.load_dataset("mpg").dropna()
-
-# Variables predictoras: peso (weight) y potencia (horsepower)
-X = mtcars[["weight", "horsepower"]]
-y = mtcars["mpg"]
-
-# Ajuste del modelo
-modelo = LinearRegression()
-modelo.fit(X, y)
-
-print("Intercepto:", modelo.intercept_)
-print("Coeficientes:", dict(zip(X.columns, modelo.coef_)))
-print("R²:", modelo.score(X, y))
-
-# Diagnóstico con statsmodels
-X_sm = sm.add_constant(X)
-modelo_sm = sm.OLS(y, X_sm).fit()
-print(modelo_sm.summary())
-
-# Visualización
-plt.figure(figsize=(8,6))
-sns.scatterplot(x=mtcars["weight"], y=mtcars["mpg"], hue=mtcars["horsepower"], palette="Blues", s=80)
-sns.regplot(x="weight", y="mpg", data=mtcars, scatter=False, color="red")
-plt.title("Regresión Lineal Múltiple: mpg ~ weight + horsepower", fontsize=14)
-plt.show()
-
-```
-
-
-### 10.7.3) Regularización (Ridge y Lasso)
-```{python}
-# Dataset: mtcars con varias variables predictoras
-X = mtcars[["weight", "horsepower", "displacement", "cylinders"]]
-y = mtcars["mpg"]
-
-# Ridge
-ridge = Ridge(alpha=1.0)
-ridge.fit(X, y)
-
-# Lasso
-lasso = Lasso(alpha=0.1)
-lasso.fit(X, y)
-
-print("Coeficientes Ridge:", dict(zip(X.columns, ridge.coef_)))
-print("Coeficientes Lasso:", dict(zip(X.columns, lasso.coef_)))
-
-# Trayectoria de coeficientes para Lasso
-alphas = np.logspace(-3, 2, 100)
-coefs = []
-
-for a in alphas:
-    lasso = Lasso(alpha=a, max_iter=5000)
-    lasso.fit(X, y)
-    coefs.append(lasso.coef_)
-
-plt.figure(figsize=(8,6))
-ax = plt.gca()
-ax.plot(alphas, coefs)
-ax.set_xscale("log")
-plt.xlabel("Lambda (α)")
-plt.ylabel("Coeficientes")
-plt.title("Trayectoria de coeficientes (Lasso)")
-plt.show()
-
-```
-
-
-### 10.7.4) Regularización Ridge con validación cruzada
-
-```{python}
-
-# Ridge con validación cruzada
-alphas = np.logspace(-3, 3, 100)
-ridge_cv = RidgeCV(alphas=alphas, store_cv_values=True)
-ridge_cv.fit(X, y)
-
-print("Mejor lambda (α):", ridge_cv.alpha_)
-print("Coeficientes Ridge:", dict(zip(X.columns, ridge_cv.coef_)))
-
-# Gráfico de coeficientes vs lambda
-coefs = []
-for a in alphas:
-    ridge = Ridge(alpha=a)
-    ridge.fit(X, y)
-    coefs.append(ridge.coef_)
-
-plt.figure(figsize=(8,6))
-ax = plt.gca()
-ax.plot(alphas, coefs)
-ax.set_xscale("log")
-plt.xlabel("Lambda (α)")
-plt.ylabel("Coeficientes")
-plt.title("Trayectoria de coeficientes (Ridge)")
-plt.show()
-
-```
-
-
-
-### 10.7.5) Regularización Lasso con validación cruzada
-
-```{python}
-
-# Lasso con validación cruzada
-lasso_cv = LassoCV(alphas=alphas, cv=5, max_iter=5000)
-lasso_cv.fit(X, y)
-
-print("Mejor lambda (α):", lasso_cv.alpha_)
-print("Coeficientes Lasso:", dict(zip(X.columns, lasso_cv.coef_)))
-
-# Gráfico de coeficientes vs lambda
-plt.figure(figsize=(8,6))
-ax = plt.gca()
-ax.plot(lasso_cv.alphas_, lasso_cv.path(X, y, alphas=alphas, max_iter=5000)[1].T)
-ax.set_xscale("log")
-plt.xlabel("Lambda (α)")
-plt.ylabel("Coeficientes")
-plt.title("Trayectoria de coeficientes (Lasso)")
-plt.show()
-
-```
-
-
-
-### 10.7.6) Elastic Net
-
-
-```{python}
-
-# Elastic Net con validación cruzada
-elastic_cv = ElasticNetCV(l1_ratio=0.5, alphas=alphas, cv=5, max_iter=5000)
-elastic_cv.fit(X, y)
-
-print("Mejor lambda (α):", elastic_cv.alpha_)
-print("Coeficientes Elastic Net:", dict(zip(X.columns, elastic_cv.coef_)))
-
-# Trayectoria de coeficientes
-coefs = []
-for a in alphas:
-    en = ElasticNet(alpha=a, l1_ratio=0.5, max_iter=5000)
-    en.fit(X, y)
-    coefs.append(en.coef_)
-
-plt.figure(figsize=(8,6))
-ax = plt.gca()
-ax.plot(alphas, coefs)
-ax.set_xscale("log")
-plt.xlabel("Lambda (α)")
-plt.ylabel("Coeficientes")
-plt.title("Trayectoria de coeficientes (Elastic Net)")
-plt.show()
-
-```
+La lectura práctica es esta: `lambda.min` suele dar el menor error promedio de validación cruzada; `lambda.1se` elige un modelo más simple dentro de una desviación estándar del mínimo. Para predicción robusta, muchas veces se prefiere `lambda.1se`; para exprimir precisión, `lambda.min`.
