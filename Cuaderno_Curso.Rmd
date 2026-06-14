@@ -18,6 +18,8 @@ output:
 
 El presente cuaderno resume los temas vistos en el [curso](https://github.com/joanby/curso-estadistica-multivariante) de estadística multivariante en R.
 
+Como referencia conceptual complementaria se usa el libro de Bruce, P., Bruce, A. y Gedeck, P. (2020), *Practical Statistics for Data Scientists*, O'Reilly. Las ideas se adaptan al enfoque de este portafolio y los ejemplos se reescriben en R para mantener el proyecto en un solo lenguaje.
+
 Primero, cargamos las librerías de R necesarias para reproducir los ejemplos. El proyecto se ejecuta únicamente con R, sin dependencias de otros lenguajes.
 Cargamos librerías de R
 
@@ -61,6 +63,11 @@ library(viridis)      # Paletas de color perceptualmente uniformes
 library(tidyverse)    # Colección de paquetes para ciencia de datos (dplyr, ggplot2, tidyr, readr, etc.)
 library(janitor)      # Limpieza de datos (clean_names, tabyl)
 library(scales)       # Etiquetas y escalas en gráficos (percent, comma, etc.)
+library(boot)         # Bootstrap e intervalos por remuestreo
+library(pROC)         # Curvas ROC y AUC
+library(rpart)        # Árboles de decisión
+library(rpart.plot)   # Visualización de árboles
+library(randomForest) # Bosques aleatorios e importancia de variables
 
 
 library(MASS)
@@ -425,6 +432,56 @@ ggplot(X, aes(x = Income, y = `Life Exp`, color = Region)) +
 ```
 
 Este código en R carga el conjunto de datos state.x77, añade el nombre del estado como columna y asigna a cada estado una región (Region) usando el vector state.region. Luego, calcula la mediana multivariada por región utilizando la función depth.halfspace, que identifica el punto más central (con mayor profundidad estadística) dentro de las variables Population, Income, Illiteracy y Life Exp. Finalmente, se genera un gráfico con ggplot2 que muestra la relación entre Income (ingreso) y Life Exp (esperanza de vida), donde cada punto representa un estado y está coloreado según su región. Los puntos grandes en negro indican la mediana multivariada de cada región, lo que permite comparar visualmente la posición central de cada grupo regional en el espacio de las dos variables seleccionadas.
+
+### 1.1.3) EDA robusto: centro, dispersión y outliers
+
+Bruce, Bruce y Gedeck enfatizan que en análisis exploratorio no basta con calcular promedios: también hay que revisar estimadores robustos y la presencia de valores extremos. La media usa toda la información, pero puede moverse mucho ante outliers; la mediana, la media recortada, el rango intercuartílico y la desviación absoluta mediana son más resistentes.
+
+La media aritmética es:
+
+$$\bar{x} = \frac{1}{n}\sum_{i=1}^{n}x_i$$
+
+Una media recortada elimina una proporción de observaciones en cada cola antes de promediar. El rango intercuartílico resume la dispersión central:
+
+$$IQR = Q_3 - Q_1$$
+
+La desviación absoluta mediana se define como:
+
+$$MAD = median(|x_i - median(x)|)$$
+
+```{r message=FALSE, warning=FALSE}
+eda_robusto <- tibble(
+  escenario = c(rep("Original", length(X$Murder)), "Con outlier"),
+  murder = c(X$Murder, 45)
+)
+
+resumen_robusto <- eda_robusto %>%
+  dplyr::group_by(escenario) %>%
+  dplyr::summarise(
+    media = mean(murder),
+    mediana = median(murder),
+    media_recortada_10 = mean(murder, trim = 0.10),
+    desviacion_estandar = sd(murder),
+    iqr = IQR(murder),
+    mad = mad(murder),
+    p95 = quantile(murder, 0.95),
+    .groups = "drop"
+  )
+
+resumen_robusto
+
+ggplot(eda_robusto, aes(x = escenario, y = murder, fill = escenario)) +
+  geom_boxplot(alpha = 0.7, show.legend = FALSE) +
+  geom_jitter(width = 0.12, alpha = 0.55) +
+  labs(
+    title = "Media vs medidas robustas ante un valor extremo",
+    x = NULL,
+    y = "Tasa de homicidios"
+  ) +
+  theme_minimal()
+```
+
+La lectura práctica es directa: si al agregar un valor extremo la media y la desviación estándar cambian mucho, pero la mediana, la media recortada, el IQR y el MAD cambian poco, el análisis debe reportar medidas robustas además de las clásicas. Esto es especialmente importante antes de PCA, clustering o regresión, porque esos métodos pueden heredar la influencia de observaciones atípicas.
 
 ## 1.2) Ejemplo en R
 
@@ -1856,6 +1913,179 @@ psych::cortest.bartlett(cor(data_cov), n = nrow(data_cov))
 df_manova <- data.frame(data_cov, Grupo = factor(rep(c("A", "B"), each = 50)))
 summary(manova(cbind(X1, X2, X3) ~ Grupo, data = df_manova), test = "Wilks")
 ```
+
+## 4.10) Muestreo, bootstrap e intervalos de confianza
+
+Un tema central en *Practical Statistics for Data Scientists* es que una estadística calculada en una muestra, como una media o una mediana, también tiene variabilidad. Si tomáramos muchas muestras de la misma población, obtendríamos estimaciones parecidas pero no idénticas. Esa variabilidad se resume con el error estándar.
+
+Para una media, una aproximación clásica es:
+
+$$SE(\bar{X}) = \frac{s}{\sqrt{n}}$$
+
+El bootstrap estima esa variabilidad sin asumir una fórmula cerrada: toma muchas muestras con reemplazo de los datos observados, calcula la estadística en cada remuestra y usa la distribución resultante para construir intervalos.
+
+```{r message=FALSE, warning=FALSE}
+set.seed(123)
+income <- as.numeric(state.x77[, "Income"])
+
+boot_media <- boot::boot(
+  data = income,
+  statistic = function(data, indices) mean(data[indices]),
+  R = 1000
+)
+
+boot_mediana <- boot::boot(
+  data = income,
+  statistic = function(data, indices) median(data[indices]),
+  R = 1000
+)
+
+data.frame(
+  estadistico = c("Media", "Mediana"),
+  estimacion = c(mean(income), median(income)),
+  error_estandar_boot = c(sd(boot_media$t), sd(boot_mediana$t)),
+  ci_2.5 = c(quantile(boot_media$t, 0.025), quantile(boot_mediana$t, 0.025)),
+  ci_97.5 = c(quantile(boot_media$t, 0.975), quantile(boot_mediana$t, 0.975))
+)
+
+boot_df <- tibble(
+  media_boot = as.numeric(boot_media$t)
+)
+
+ggplot(boot_df, aes(x = media_boot)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+  geom_vline(xintercept = mean(income), color = "red", linewidth = 1) +
+  labs(
+    title = "Distribucion bootstrap de la media de Income",
+    x = "Media bootstrap",
+    y = "Frecuencia"
+  ) +
+  theme_minimal()
+```
+
+Un intervalo de confianza no dice que la probabilidad de que el parámetro esté dentro del intervalo sea $95\%$ para ese intervalo ya observado. La interpretación frecuentista es de procedimiento: si repitiéramos el muestreo muchas veces, aproximadamente el $95\%$ de los intervalos construidos de esta forma cubrirían el parámetro poblacional.
+
+## 4.11) Pruebas de permutación y A/B testing
+
+Una prueba de permutación evalúa una hipótesis nula construyendo una distribución de referencia a partir de reordenar etiquetas. En un A/B test, la hipótesis nula típica afirma que no hay diferencia real entre grupos:
+
+$$H_0: \mu_A = \mu_B$$
+
+Si $T_{obs}$ es la diferencia observada de medias, el p-valor empírico bilateral puede estimarse como:
+
+$$p = \frac{1 + \sum_{b=1}^{B} I(|T_b| \geq |T_{obs}|)}{B + 1}$$
+
+donde $T_b$ es la diferencia obtenida en la permutación $b$.
+
+```{r message=FALSE, warning=FALSE}
+set.seed(123)
+ab_test <- tibble(
+  grupo = rep(c("A", "B"), each = 120),
+  tiempo_sesion = c(
+    rgamma(120, shape = 6, rate = 1.1),
+    rgamma(120, shape = 6.4, rate = 1.05)
+  )
+)
+
+diferencia_observada <- ab_test %>%
+  dplyr::group_by(grupo) %>%
+  dplyr::summarise(media = mean(tiempo_sesion), .groups = "drop") %>%
+  dplyr::summarise(diff = media[grupo == "B"] - media[grupo == "A"]) %>%
+  dplyr::pull(diff)
+
+B <- 5000
+diferencias_perm <- replicate(B, {
+  grupos_perm <- sample(ab_test$grupo)
+  mean(ab_test$tiempo_sesion[grupos_perm == "B"]) -
+    mean(ab_test$tiempo_sesion[grupos_perm == "A"])
+})
+
+p_valor_perm <- (1 + sum(abs(diferencias_perm) >= abs(diferencia_observada))) / (B + 1)
+
+data.frame(
+  diferencia_observada = diferencia_observada,
+  p_valor_permutacion = p_valor_perm,
+  decision_alpha_0.05 = ifelse(p_valor_perm < 0.05, "Rechazar H0", "No rechazar H0")
+)
+
+ggplot(tibble(diferencias_perm), aes(x = diferencias_perm)) +
+  geom_histogram(bins = 35, fill = "gray75", color = "white") +
+  geom_vline(xintercept = c(-abs(diferencia_observada), abs(diferencia_observada)),
+             color = "red", linetype = 2, linewidth = 1) +
+  labs(
+    title = "Distribucion nula por permutacion en un A/B test",
+    x = "Diferencia de medias permutada (B - A)",
+    y = "Frecuencia"
+  ) +
+  theme_minimal()
+```
+
+El nivel $\alpha$ es una regla de decisión antes de ver los datos. Si usamos $\alpha = 0.05$, aceptamos aproximadamente un $5\%$ de riesgo de error tipo I bajo $H_0$. El error tipo II ocurre cuando no detectamos un efecto que sí existe; por eso el tamaño de muestra y la potencia importan tanto como el p-valor.
+
+## 4.12) Variables categóricas, chi-cuadrado y Fisher
+
+Cuando las variables son categóricas, la pregunta ya no es sobre medias sino sobre asociación entre frecuencias. La prueba chi-cuadrado compara frecuencias observadas contra frecuencias esperadas bajo independencia:
+
+$$\chi^2 = \sum_{i=1}^{R}\sum_{j=1}^{C}\frac{(O_{ij} - E_{ij})^2}{E_{ij}}$$
+
+Si hay conteos esperados muy pequeños, la prueba exacta de Fisher suele ser más apropiada en tablas $2 \times 2$.
+
+```{r message=FALSE, warning=FALSE}
+tabla_campania <- matrix(
+  c(42, 58, 28, 72),
+  nrow = 2,
+  byrow = TRUE,
+  dimnames = list(
+    grupo = c("Tratamiento", "Control"),
+    resultado = c("Compra", "No compra")
+  )
+)
+
+tabla_campania
+chisq.test(tabla_campania, correct = FALSE)
+fisher.test(tabla_campania)
+prop.table(tabla_campania, margin = 1)
+```
+
+La lectura práctica debe combinar estadística y tamaño de efecto: un p-valor pequeño sugiere asociación, pero la tabla de proporciones indica si la diferencia es relevante para el negocio o el problema científico.
+
+## 4.13) Comparaciones múltiples
+
+Cuando hacemos muchas pruebas, aumenta la probabilidad de falsos positivos. Si hacemos $m$ pruebas independientes con $\alpha = 0.05$, la probabilidad de obtener al menos un falso positivo bajo todas las hipótesis nulas es:
+
+$$P(\text{al menos un falso positivo}) = 1 - (1-\alpha)^m$$
+
+Por eso conviene ajustar p-valores cuando se exploran muchas variables o muchos segmentos.
+
+```{r message=FALSE, warning=FALSE}
+set.seed(123)
+datos_multi <- tibble(
+  grupo = rep(c("A", "B"), each = 80)
+)
+
+for (j in 1:20) {
+  datos_multi[[paste0("metrica_", j)]] <- rnorm(160)
+}
+
+p_values <- sapply(paste0("metrica_", 1:20), function(var) {
+  t.test(datos_multi[[var]] ~ datos_multi$grupo)$p.value
+})
+
+tabla_p <- tibble(
+  metrica = names(p_values),
+  p_valor = as.numeric(p_values),
+  p_bonferroni = p.adjust(p_values, method = "bonferroni"),
+  p_fdr = p.adjust(p_values, method = "BH")
+) %>%
+  dplyr::arrange(p_valor)
+
+head(tabla_p, 10)
+sum(tabla_p$p_valor < 0.05)
+sum(tabla_p$p_fdr < 0.05)
+```
+
+La idea no es prohibir la exploración, sino separar descubrimiento de confirmación. En análisis exploratorio podemos generar hipótesis; para concluir con fuerza necesitamos controlar el error por múltiples comparaciones o validar en datos nuevos.
+
 # 5) Análisis con componentes principales
 
 El Análisis con Componentes Principales (PCA, por sus siglas en inglés) es una técnica estadística que transforma un conjunto de variables posiblemente correlacionadas en un nuevo conjunto de variables no correlacionadas llamadas componentes principales. Cada componente principal es una combinación lineal de las variables originales, y se ordenan de manera que el primer componente ($PC_1$) capture la mayor varianza posible de los datos, el segundo ($PC_2$) capture la mayor varianza restante, y así sucesivamente. Matemáticamente, si tenemos una matriz de datos $X$ (centrada), el PCA se basa en descomponer su matriz de covarianzas $\Sigma$ en valores y vectores propios, de modo que $\Sigma v_k = \lambda_k v_k$, donde $v_k$ es el vector propio y $\lambda_k$ su varianza asociada.
@@ -3108,7 +3338,61 @@ plot(modelo, what = "density")
 
 ```
 
-## 8.8) Ejemplo en R
+## 8.8) Validación de clustering: silhouette y gap statistic
+
+Además de visualizar grupos, conviene evaluar si el número de clústeres es razonable. Dos criterios comunes son:
+
+- **Silhouette**: mide qué tan cerca está una observación de su propio clúster frente al clúster vecino más cercano. Valores cerca de $1$ indican buena separación; valores cerca de $0$ indican frontera ambigua; valores negativos sugieren posible mala asignación.
+- **Gap statistic**: compara la compactación observada contra datos simulados sin estructura clara. Un $k$ es atractivo si la brecha es grande respecto al caso nulo.
+
+La silueta de la observación $i$ se define como:
+
+$$s_i = \frac{b_i - a_i}{\max(a_i, b_i)}$$
+
+donde $a_i$ es la distancia promedio a puntos del mismo clúster y $b_i$ la menor distancia promedio a otro clúster.
+
+```{r message=FALSE, warning=FALSE}
+set.seed(123)
+iris_cluster <- scale(iris[, 1:4])
+
+silhouette_scores <- purrr::map_dbl(2:8, function(k) {
+  km_tmp <- kmeans(iris_cluster, centers = k, nstart = 25)
+  sil <- cluster::silhouette(km_tmp$cluster, dist(iris_cluster))
+  mean(sil[, "sil_width"])
+})
+
+df_silhouette <- tibble(
+  k = 2:8,
+  silhouette_promedio = silhouette_scores
+)
+
+df_silhouette
+
+ggplot(df_silhouette, aes(x = k, y = silhouette_promedio)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(color = "red", size = 3) +
+  scale_x_continuous(breaks = 2:8) +
+  labs(
+    title = "Seleccion de k por silhouette promedio",
+    x = "Numero de clusters",
+    y = "Silhouette promedio"
+  ) +
+  theme_minimal()
+
+set.seed(123)
+gap_iris <- cluster::clusGap(
+  iris_cluster,
+  FUNcluster = function(x, k) kmeans(x, centers = k, nstart = 25),
+  K.max = 8,
+  B = 25
+)
+
+factoextra::fviz_gap_stat(gap_iris)
+```
+
+La validación de clustering no reemplaza el juicio de dominio. Si un $k$ es estadísticamente atractivo pero produce segmentos imposibles de explicar o accionar, conviene revisar variables, escalamiento y objetivo del análisis.
+
+## 8.9) Ejemplo en R
 
 ```{r fig.height=10, fig.width=12, message=FALSE, warning=FALSE}
 set.seed(123)
@@ -3486,7 +3770,101 @@ ggplot() +
 
 ```
 
-## 9.5) Ejemplo en R
+## 9.5) Evaluación de clasificación: matriz, F1, ROC y AUC
+
+Bruce, Bruce y Gedeck resaltan que en clasificación no basta con reportar exactitud. Cuando las clases están desbalanceadas, accuracy puede ser engañosa. La matriz de confusión permite leer aciertos y errores por clase:
+
+| | Predicho positivo | Predicho negativo |
+|---|---|---|
+| Real positivo | Verdaderos positivos ($TP$) | Falsos negativos ($FN$) |
+| Real negativo | Falsos positivos ($FP$) | Verdaderos negativos ($TN$) |
+
+Con esos conteos se calculan:
+
+$$Precision = \frac{TP}{TP + FP}$$
+
+$$Recall = Sensibilidad = \frac{TP}{TP + FN}$$
+
+$$F1 = 2\frac{Precision \cdot Recall}{Precision + Recall}$$
+
+La curva ROC compara sensibilidad contra tasa de falsos positivos para distintos umbrales. El AUC resume esa curva: valores cercanos a $1$ indican mejor separación entre clases.
+
+```{r message=FALSE, warning=FALSE}
+set.seed(123)
+iris_bin <- iris %>%
+  dplyr::mutate(clase = factor(ifelse(Species == "virginica", "Si", "No"))) %>%
+  dplyr::select(Sepal.Length, Sepal.Width, Petal.Length, Petal.Width, clase)
+
+idx_train <- caret::createDataPartition(iris_bin$clase, p = 0.70, list = FALSE)
+train_bin <- iris_bin[idx_train, ]
+test_bin <- iris_bin[-idx_train, ]
+
+modelo_logit_iris <- glm(clase ~ ., data = train_bin, family = binomial)
+prob_test <- predict(modelo_logit_iris, newdata = test_bin, type = "response")
+pred_test <- factor(ifelse(prob_test >= 0.5, "Si", "No"), levels = c("No", "Si"))
+
+matriz_confusion <- caret::confusionMatrix(
+  data = pred_test,
+  reference = test_bin$clase,
+  positive = "Si"
+)
+
+matriz_confusion$table
+matriz_confusion$byClass[c("Sensitivity", "Specificity", "Precision", "Recall", "F1")]
+matriz_confusion$overall[c("Accuracy", "Kappa")]
+
+roc_iris <- pROC::roc(
+  response = test_bin$clase,
+  predictor = prob_test,
+  levels = c("No", "Si"),
+  quiet = TRUE
+)
+
+pROC::auc(roc_iris)
+plot(roc_iris, col = "steelblue", lwd = 2, main = "Curva ROC - clasificacion virginica")
+abline(a = 0, b = 1, lty = 2, col = "gray50")
+```
+
+El umbral de $0.5$ no siempre es el mejor. En fraude, enfermedad o churn, puede ser preferible aumentar recall aunque bajen precisión o especificidad. La métrica debe elegirse según el costo de cada tipo de error.
+
+## 9.6) Árboles de decisión y Random Forest
+
+Los árboles de decisión dividen el espacio de predictores en regiones simples. Son interpretables y capturan interacciones, pero pueden sobreajustar si crecen demasiado. Random Forest promedia muchos árboles construidos con remuestreo y subconjuntos aleatorios de variables; suele mejorar estabilidad y desempeño, a costa de perder algo de interpretabilidad.
+
+```{r message=FALSE, warning=FALSE}
+set.seed(123)
+idx_iris <- caret::createDataPartition(iris$Species, p = 0.70, list = FALSE)
+iris_train <- iris[idx_iris, ]
+iris_test <- iris[-idx_iris, ]
+
+arbol_iris <- rpart::rpart(
+  Species ~ .,
+  data = iris_train,
+  method = "class",
+  control = rpart::rpart.control(cp = 0.01)
+)
+
+rpart.plot::rpart.plot(arbol_iris, main = "Árbol de decisión - iris")
+
+pred_arbol <- predict(arbol_iris, newdata = iris_test, type = "class")
+caret::confusionMatrix(pred_arbol, iris_test$Species)
+
+set.seed(123)
+rf_iris <- randomForest::randomForest(
+  Species ~ .,
+  data = iris_train,
+  ntree = 200,
+  importance = TRUE
+)
+
+pred_rf <- predict(rf_iris, newdata = iris_test)
+caret::confusionMatrix(pred_rf, iris_test$Species)
+randomForest::varImpPlot(rf_iris, main = "Importancia de variables - Random Forest")
+```
+
+La lectura práctica es comparar interpretabilidad y desempeño. Un árbol único ayuda a explicar reglas; un bosque aleatorio suele generalizar mejor. En ambos casos se debe validar fuera de muestra.
+
+## 9.7) Ejemplo en R
 
 ```{r fig.height=10, fig.width=12, message=FALSE, warning=FALSE}
 set.seed(123)
@@ -3905,3 +4283,76 @@ par(mfrow = c(1, 1))
 ```
 
 La lectura práctica es esta: `lambda.min` suele dar el menor error promedio de validación cruzada; `lambda.1se` elige un modelo más simple dentro de una desviación estándar del mínimo. Para predicción robusta, muchas veces se prefiere `lambda.1se`; para exprimir precisión, `lambda.min`.
+
+## 10.8) Regresión ponderada, extrapolación e intervalos
+
+Un modelo de regresión no siempre debe tratar todas las observaciones con el mismo peso. En regresión ponderada, cada observación recibe un peso $w_i$ y el modelo minimiza:
+
+$$\sum_{i=1}^{n} w_i(y_i - \hat{y}_i)^2$$
+
+Esto es útil cuando algunas observaciones son más precisas, representan más unidades poblacionales o cuando la varianza del error cambia de forma conocida. Si la varianza crece con $X$, una estrategia simple es dar menor peso a observaciones con mayor varianza esperada.
+
+```{r message=FALSE, warning=FALSE}
+set.seed(123)
+n_w <- 160
+datos_wls <- tibble(
+  x = runif(n_w, 1, 10)
+) %>%
+  dplyr::mutate(
+    sigma = 0.5 + 0.35 * x,
+    y = 5 + 2.1 * x + rnorm(n_w, sd = sigma),
+    peso = 1 / sigma^2
+  )
+
+modelo_ols <- lm(y ~ x, data = datos_wls)
+modelo_wls <- lm(y ~ x, data = datos_wls, weights = peso)
+
+broom::tidy(modelo_ols)
+broom::tidy(modelo_wls)
+
+comparacion_wls <- broom::glance(modelo_ols) %>%
+  dplyr::select(r.squared, adj.r.squared, sigma, AIC, BIC) %>%
+  dplyr::mutate(modelo = "OLS") %>%
+  dplyr::bind_rows(
+    broom::glance(modelo_wls) %>%
+      dplyr::select(r.squared, adj.r.squared, sigma, AIC, BIC) %>%
+      dplyr::mutate(modelo = "WLS")
+  ) %>%
+  dplyr::select(modelo, dplyr::everything())
+
+comparacion_wls
+
+ggplot(datos_wls, aes(x = x, y = y)) +
+  geom_point(alpha = 0.6, color = "gray35") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  geom_smooth(method = "lm", se = FALSE, aes(weight = peso), color = "steelblue") +
+  labs(
+    title = "OLS vs regresion ponderada",
+    subtitle = "Rojo: OLS | Azul: WLS con menor peso para observaciones mas ruidosas",
+    x = "X",
+    y = "Y"
+  ) +
+  theme_minimal()
+```
+
+La extrapolación ocurre cuando se predice fuera del rango observado de los predictores. Aunque `predict()` entregue un valor, la incertidumbre real puede ser mucho mayor porque el modelo no vio datos en esa zona.
+
+```{r message=FALSE, warning=FALSE}
+nuevos_x <- tibble(
+  x = c(3, 8, 14)
+) %>%
+  dplyr::mutate(
+    zona = ifelse(x > max(datos_wls$x) | x < min(datos_wls$x), "Extrapolacion", "Interpolacion")
+  )
+
+pred_conf <- predict(modelo_wls, newdata = nuevos_x, interval = "confidence")
+pred_pred <- predict(modelo_wls, newdata = nuevos_x, interval = "prediction")
+
+cbind(
+  nuevos_x,
+  intervalo_confianza_media = round(pred_conf, 2),
+  intervalo_prediccion_individual = round(pred_pred, 2)
+)
+```
+
+Un intervalo de confianza describe incertidumbre sobre la media esperada $E(Y|X=x_0)$; un intervalo de predicción describe incertidumbre sobre una nueva observación individual. Por eso el intervalo de predicción casi siempre es más ancho. En decisiones predictivas, la recomendación práctica es reportar ambos cuando el usuario necesita saber tanto la tendencia promedio como el rango plausible de casos individuales.

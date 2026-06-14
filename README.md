@@ -5,14 +5,20 @@ Este portafolio contiene un cuaderno de curso sobre estadistica
 multivariante avanzada implementado unicamente en R. El material
 principal esta en `Cuaderno_Curso.Rmd` e integra explicaciones teoricas,
 formulas, ejemplos reproducibles y visualizaciones sobre espacio
-multivariante, correlaciones, distribuciones multivariantes, inferencia,
-PCA, analisis factorial, escalamiento multidimensional, clusterizacion,
-clasificacion, regresion y regularizacion.
+multivariante, correlaciones, EDA robusto, remuestreo, pruebas de
+significancia, distribuciones multivariantes, inferencia, PCA, analisis
+factorial, escalamiento multidimensional, clusterizacion, clasificacion,
+regresion y regularizacion.
+
+El cuaderno usa como referencia conceptual complementaria el libro de
+Bruce, P., Bruce, A. y Gedeck, P. (2020), *Practical Statistics for Data
+Scientists*, O’Reilly. Los ejemplos fueron adaptados y reescritos en R
+para mantener el portafolio en un solo lenguaje.
 
 La seccion de regresion enfatiza la lectura tecnica de `summary(lm)`,
 errores estandar, p-valores, grados de libertad, intervalos, diagnostico
-de residuales, multicolinealidad, validacion cruzada y comparacion entre
-inferencia y prediccion.
+de residuales, multicolinealidad, validacion cruzada, regresion
+ponderada y comparacion entre inferencia y prediccion.
 
 El proyecto esta pensado para trabajarse desde RStudio o desde una
 sesion estandar de R. Los archivos renderizados se pueden regenerar
@@ -56,7 +62,8 @@ reportes. Entre los paquetes principales estan `tidyverse`, `ggplot2`,
 `ellipse`, `psych`, `GPArotation`, `corrplot`, `vegan`, `cluster`,
 `factoextra`, `caret`, `class`, `e1071`, `glmnet`, `ggpubr`, `broom`,
 `car`, `leaps`, `ddalpha`, `scatterplot3d`, `patchwork`, `aplpack`,
-`janitor`, `scales`, `ICSNP` y `reshape2`.
+`janitor`, `scales`, `ICSNP`, `reshape2`, `boot`, `pROC`, `rpart`,
+`rpart.plot` y `randomForest`.
 
 Instala los paquetes faltantes desde R antes de renderizar:
 
@@ -66,7 +73,8 @@ install.packages(c(
   "Hotelling", "ellipse", "psych", "GPArotation", "corrplot",
   "vegan", "cluster", "factoextra", "caret", "e1071", "glmnet",
   "ggpubr", "broom", "car", "leaps", "ddalpha", "scatterplot3d",
-  "patchwork", "aplpack", "janitor", "ICSNP", "reshape2"
+  "patchwork", "aplpack", "janitor", "ICSNP", "reshape2",
+  "boot", "pROC", "rpart", "rpart.plot", "randomForest"
 ))
 ```
 
