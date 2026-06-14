@@ -3580,6 +3580,23 @@ $$SE(\bar{X}) = \frac{s}{\sqrt{n}}$$
 
 Esto explica por qué muestras más grandes producen estimaciones más precisas: al cuadruplicar $n$, el error estándar se reduce aproximadamente a la mitad.
 
+La siguiente tabla resume cómo leer estos estadísticos cuando aparecen en `summary(lm)` o en salidas ordenadas como `broom::tidy()` y `broom::glance()`:
+
+| Estadístico | Qué mide | Cómo interpretarlo | Señal de alerta o lectura práctica |
+|---|---|---|---|
+| `Residuals` | Distribución de los errores $e_i = y_i - \hat{y}_i$. | Deben estar centrados cerca de cero y sin asimetrías extremas. | Residuales muy sesgados, colas largas o extremos grandes sugieren outliers, no linealidad o varianza no constante. |
+| `Estimate` | Estimación puntual $\hat{\beta}_j$ de cada coeficiente. | Indica el cambio esperado en $Y$ por una unidad adicional de $X_j$, manteniendo constantes los demás predictores. | El signo muestra dirección; la magnitud debe leerse en unidades reales y con contexto sustantivo. |
+| `Std. Error` | Incertidumbre muestral de $\hat{\beta}_j$. | Errores estándar pequeños indican estimaciones más precisas; errores grandes indican más variabilidad de estimación. | Puede inflarse por muestra pequeña, ruido alto, outliers o multicolinealidad. |
+| `t value` | Relación señal/incertidumbre: $t_j = \hat{\beta}_j / SE(\hat{\beta}_j)$. | Valores absolutos grandes indican que el coeficiente está lejos de cero en unidades de error estándar. | Un $t$ pequeño sugiere evidencia débil contra $H_0:\beta_j=0$, pero no implica que la variable sea inútil para predicción. |
+| <code>Pr(&gt;&#124;t&#124;)</code> | p-valor bilateral para $H_0:\beta_j=0$. | Si $p < \alpha$, el coeficiente parece estadísticamente distinto de cero bajo los supuestos del modelo. | Un p-valor bajo no prueba causalidad; un p-valor alto puede aparecer por colinealidad o baja potencia. |
+| `Residual standard error` | Tamaño típico del error del modelo en unidades de $Y$. | Se interpreta como el error residual promedio aproximado después de ajustar por $p$ predictores. | Si es grande frente a la escala de $Y$, el modelo predice poco fino aunque tenga coeficientes significativos. |
+| `RMSE` | Error cuadrático medio de predicción. | Resume el tamaño promedio de los errores, penalizando más los errores grandes. | Debe compararse entre modelos y, preferiblemente, en validación cruzada o datos fuera de muestra. |
+| `Multiple R-squared` | Proporción de variabilidad de $Y$ explicada por el modelo. | Valores altos indican mejor ajuste dentro de la muestra. | Puede aumentar al agregar predictores aunque no aporten valor real; no mide causalidad ni error fuera de muestra. |
+| `Adjusted R-squared` | $R^2$ penalizado por número de predictores. | Es más útil que $R^2$ para comparar modelos con diferente cantidad de variables. | Si baja al agregar una variable, esa variable probablemente no compensa su complejidad. |
+| `F-statistic` | Prueba global del modelo contra un modelo con solo intercepto. | Evalúa si el conjunto de predictores explica variabilidad de $Y$ más allá del promedio. | Puede ser significativo aunque algunos coeficientes individuales no lo sean. |
+| p-valor global | Evidencia contra $H_0:\beta_1=\beta_2=\dots=\beta_p=0$. | Un valor bajo sugiere que al menos un predictor tiene asociación lineal con $Y$. | No dice cuál predictor importa ni garantiza buen desempeño predictivo. |
+| Grados de libertad residuales | Información restante tras estimar parámetros: $df_{res}=n-p-1$. | Más grados de libertad suelen dar estimaciones de error más estables. | Pocos grados de libertad frente al número de predictores aumentan riesgo de sobreajuste e inferencia inestable. |
+
 ```{r message=FALSE, warning=FALSE}
 modelo_mtcars <- lm(mpg ~ wt + hp, data = mtcars)
 
